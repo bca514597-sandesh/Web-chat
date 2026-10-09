@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rathore Chat - Live Messaging</title>
+    <title>Rathore Chat - Private Messenger</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -14,36 +14,55 @@
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
-        body { background: #e5ddd5; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        body { background: #d1d7db; height: 100vh; display: flex; justify-content: center; align-items: center; }
 
-        /* Login/Signup Screen */
-        #login-screen { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; }
-        #login-screen h2 { color: #075e54; margin-bottom: 20px; font-size: 2rem; }
+        /* Login Screen */
+        #login-screen { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; z-index: 100; }
+        #login-screen h2 { color: #128C7E; margin-bottom: 20px; font-size: 2rem; }
         .input-box { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; outline: none; }
         .btn { background: #128C7E; color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; font-size: 1.1rem; cursor: pointer; transition: 0.3s; margin-top: 10px; font-weight: 600; }
         .btn:hover { background: #075e54; }
-        .btn-signup { background: #34b7f1; }
-        .btn-signup:hover { background: #2a94c4; }
 
-        /* Chat Screen (CSS Fixed Here) */
-        #chat-screen { width: 100%; max-width: 900px; height: 90vh; background: white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column; }
+        /* WhatsApp Web Layout */
+        #app-container { display: none; width: 100%; max-width: 1200px; height: 95vh; background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.2); display: flex; overflow: hidden; }
         
-        .chat-header { background: #075e54; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
-        .chat-header .user-info { display: flex; align-items: center; gap: 15px; }
-        .chat-header img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; }
-        .logout-btn { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; }
+        /* Left Sidebar (Contacts) */
+        #sidebar { width: 30%; background: #ffffff; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+        .sidebar-header { background: #f0f2f5; padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; }
+        .my-profile { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+        .my-profile img { width: 40px; height: 40px; border-radius: 50%; }
         
-        .chat-area { flex: 1; background: #efe7dd url('https://www.transparenttextures.com/patterns/cubes.png'); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .add-friend-btn { background: #128C7E; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 0.9rem; }
         
-        .message { max-width: 60%; padding: 10px 15px; border-radius: 10px; font-size: 0.95rem; position: relative; clear: both; word-wrap: break-word; }
-        .message.received { background: white; align-self: flex-start; border-top-left-radius: 0; }
-        .message.sent { background: #dcf8c6; align-self: flex-end; border-top-right-radius: 0; }
-        .msg-sender { font-size: 0.75rem; font-weight: bold; color: #075e54; margin-bottom: 3px; display: block; text-transform: capitalize; }
+        .contact-list { flex: 1; overflow-y: auto; list-style: none; }
+        .contact-item { padding: 15px; border-bottom: 1px solid #f2f2f2; display: flex; align-items: center; gap: 15px; cursor: pointer; transition: 0.2s; }
+        .contact-item:hover { background: #f5f6f6; }
+        .contact-item.active { background: #ebebeb; }
+        .contact-item img { width: 45px; height: 45px; border-radius: 50%; }
+        .contact-info h4 { font-size: 1rem; color: #333; }
+        .contact-info p { font-size: 0.8rem; color: #888; }
+
+        /* Right Chat Window */
+        #chat-window { width: 70%; display: flex; flex-direction: column; background: #efe7dd url('https://www.transparenttextures.com/patterns/cubes.png'); }
+        
+        /* Empty State */
+        #empty-chat { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #f8f9fa; color: #888; }
+        #empty-chat i { font-size: 5rem; color: #ccc; margin-bottom: 20px; }
+
+        /* Active Chat */
+        #active-chat { display: none; flex: 1; flex-direction: column; }
+        .chat-header { background: #f0f2f5; padding: 15px 20px; display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #ddd; }
+        .chat-header img { width: 45px; height: 45px; border-radius: 50%; }
+        
+        .chat-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .message { max-width: 60%; padding: 10px 15px; border-radius: 10px; font-size: 0.95rem; position: relative; word-wrap: break-word; }
+        .message.received { background: white; align-self: flex-start; border-top-left-radius: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .message.sent { background: #dcf8c6; align-self: flex-end; border-top-right-radius: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
         .msg-time { font-size: 0.7rem; color: #888; display: block; text-align: right; margin-top: 5px; }
 
         .input-area { background: #f0f0f0; padding: 15px; display: flex; align-items: center; gap: 15px; }
-        .input-area input { flex: 1; padding: 12px 20px; border: none; border-radius: 25px; font-size: 1rem; outline: none; }
-        .send-btn { background: #128C7E; color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; }
+        .input-area input { flex: 1; padding: 15px 20px; border: none; border-radius: 25px; font-size: 1rem; outline: none; }
+        .send-btn { background: #128C7E; color: white; border: none; width: 50px; height: 50px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; }
         
         .hidden { display: none !important; }
     </style>
@@ -52,154 +71,228 @@
 
     <!-- Login Screen -->
     <div id="login-screen">
-        <h2><i class="fas fa-comments"></i> Rathore Chat</h2>
-        <p style="color: #666; margin-bottom: 20px;" id="status-msg">लॉगिन करें या नया अकाउंट बनाएं</p>
-        
-        <input type="email" id="email" class="input-box" placeholder="ईमेल आईडी">
-        <input type="password" id="password" class="input-box" placeholder="पासवर्ड (कम से कम 6 अक्षर)">
-        
-        <button class="btn" onclick="loginUser()">लॉगिन करें</button>
-        <button class="btn btn-signup" onclick="signUpUser()">नया अकाउंट बनाएं</button>
+        <h2><i class="fab fa-whatsapp"></i> Rathore Chat</h2>
+        <p style="color: #666; margin-bottom: 20px;" id="status-msg">Apna email aur password dalein</p>
+        <input type="email" id="email" class="input-box" placeholder="Aapki Email ID">
+        <input type="password" id="password" class="input-box" placeholder="Password (min 6 letters)">
+        <button class="btn" onclick="loginUser()">Login</button>
+        <button class="btn" style="background: #34b7f1;" onclick="signUpUser()">Naya Account Banayein</button>
     </div>
 
-    <!-- Chat Screen -->
-    <div id="chat-screen" class="hidden">
-        <div class="chat-header">
-            <div class="user-info">
-                <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="User">
+    <!-- Main WhatsApp Layout -->
+    <div id="app-container" class="hidden">
+        
+        <!-- Left Sidebar (Contacts) -->
+        <div id="sidebar">
+            <div class="sidebar-header">
+                <div class="my-profile">
+                    <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="Me">
+                    <span id="my-name">Me</span>
+                </div>
                 <div>
-                    <h3 id="display-name">Loading...</h3>
-                    <p style="font-size: 0.8rem; color: #ddd;">ऑनलाइन</p>
+                    <button class="add-friend-btn" onclick="addFriend()"><i class="fas fa-plus"></i> Dost Jodein</button>
+                    <button class="add-friend-btn" style="background:#d9534f; margin-left:5px;" onclick="logoutUser()"><i class="fas fa-power-off"></i></button>
                 </div>
             </div>
-            <button class="logout-btn" onclick="logoutUser()" title="लॉगआउट"><i class="fas fa-sign-out-alt"></i></button>
+            <ul class="contact-list" id="contact-list">
+                <!-- Contacts dynamically yahan aayenge -->
+            </ul>
         </div>
 
-        <div class="chat-area" id="chat-area">
-            <!-- लाइव मैसेजेस यहाँ आएंगे -->
-        </div>
+        <!-- Right Window (Chat) -->
+        <div id="chat-window">
+            
+            <!-- Jab koi chat select na ho -->
+            <div id="empty-chat">
+                <i class="fas fa-comments"></i>
+                <h2>Rathore Web Chat</h2>
+                <p>Private message bhejne ke liye list se kisi dost ko chunein.</p>
+            </div>
 
-        <div class="input-area">
-            <input type="text" id="msg-input" placeholder="मैसेज टाइप करें..." onkeypress="handleKeyPress(event)">
-            <button class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+            <!-- Jab chat select ho jaye -->
+            <div id="active-chat">
+                <div class="chat-header">
+                    <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="Friend">
+                    <div>
+                        <h3 id="chat-friend-name">Friend Name</h3>
+                        <p style="font-size: 0.8rem; color: #888;" id="chat-friend-email">email@test.com</p>
+                    </div>
+                </div>
+
+                <div class="chat-area" id="chat-area">
+                    <!-- Live Messages -->
+                </div>
+
+                <div class="input-area">
+                    <input type="text" id="msg-input" placeholder="Message type karein..." onkeypress="handleKeyPress(event)">
+                    <button class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+
         </div>
     </div>
 
     <script>
-        // आपकी असली Firebase Config
+        // Aapki asli Firebase Config
         const firebaseConfig = {
             apiKey: "AIzaSyBrqb-PgLn6o_lCpjZ5S4m0njY_e4N6qPw",
             authDomain: "web-chat-1fc92.firebaseapp.com",
             projectId: "web-chat-1fc92",
             storageBucket: "web-chat-1fc92.firebasestorage.app",
             messagingSenderId: "701338081272",
-            appId: "1:701338081272:web:aa0e2251e2869c9fd7e80d",
-            measurementId: "G-B9M5W7DPP1"
+            appId: "1:701338081272:web:aa0e2251e2869c9fd7e80d"
         };
 
-        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // UI Elements
-        const loginScreen = document.getElementById('login-screen');
-        const chatScreen = document.getElementById('chat-screen');
-        const statusMsg = document.getElementById('status-msg');
-        const chatArea = document.getElementById('chat-area');
-        const msgInput = document.getElementById('msg-input');
-
+        // Variables
         let currentUser = null;
+        let currentChatId = null; 
+        let currentFriendEmail = null;
+        let unsubscribeChat = null; // Purani chat ki listening band karne ke liye
 
+        // Auth Logic
         function signUpUser() {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
-            if(!email || !password) return alert("कृपया ईमेल और पासवर्ड भरें!");
-            statusMsg.innerText = "अकाउंट बन रहा है...";
-            auth.createUserWithEmailAndPassword(email, password).catch(err => statusMsg.innerText = err.message);
+            if(!email || !password) return alert("Email aur password dalein!");
+            auth.createUserWithEmailAndPassword(email, password).catch(err => alert(err.message));
         }
 
         function loginUser() {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
-            if(!email || !password) return alert("कृपया ईमेल और पासवर्ड भरें!");
-            statusMsg.innerText = "लॉगिन हो रहा है...";
-            auth.signInWithEmailAndPassword(email, password).catch(err => statusMsg.innerText = "ईमेल या पासवर्ड गलत है!");
+            if(!email || !password) return alert("Email aur password dalein!");
+            auth.signInWithEmailAndPassword(email, password).catch(err => alert("Email ya Password galat hai!"));
         }
 
         function logoutUser() {
             auth.signOut();
         }
 
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden');
+                document.getElementById('app-container').style.display = 'flex';
+                
+                document.getElementById('my-name').innerText = user.email.split('@')[0].toUpperCase();
+                loadContacts(); // Login hote hi contact list load karein
+            } else {
+                currentUser = null;
+                document.getElementById('app-container').classList.add('hidden');
+                document.getElementById('app-container').style.display = 'none';
+                document.getElementById('login-screen').classList.remove('hidden');
+            }
+        });
+
+        // ================= CONTACTS LOGIC =================
+        
+        // Dost Add karna (Prompt box ke zariye)
+        function addFriend() {
+            const friendEmail = prompt("Apne dost ki Email ID dalein (Jisko add karna hai):");
+            if (!friendEmail || friendEmail === currentUser.email) return;
+            
+            const friendName = prompt("Dost ka naam kya save karna hai?");
+            if (!friendName) return;
+
+            // Database mein contact save karna
+            db.collection("users").doc(currentUser.email).collection("contacts").doc(friendEmail).set({
+                email: friendEmail.toLowerCase(),
+                name: friendName
+            }).then(() => {
+                alert(friendName + " aapki list mein add ho gaya hai!");
+            });
+        }
+
+        // Contacts list ko sidebar mein dikhana
+        function loadContacts() {
+            db.collection("users").doc(currentUser.email).collection("contacts")
+            .onSnapshot((snapshot) => {
+                const list = document.getElementById('contact-list');
+                list.innerHTML = '';
+                
+                snapshot.forEach((doc) => {
+                    const contact = doc.data();
+                    list.innerHTML += `
+                        <li class="contact-item" onclick="openChat('${contact.email}', '${contact.name}')">
+                            <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png">
+                            <div class="contact-info">
+                                <h4>${contact.name}</h4>
+                                <p>${contact.email}</p>
+                            </div>
+                        </li>
+                    `;
+                });
+            });
+        }
+
+        // ================= PRIVATE CHAT LOGIC =================
+
+        // Private Chat Room ID Banana (Dono emails ko milakar ek unique ID banti hai)
+        function getChatId(email1, email2) {
+            return email1 < email2 ? email1 + "_" + email2 : email2 + "_" + email1;
+        }
+
+        function openChat(friendEmail, friendName) {
+            currentFriendEmail = friendEmail;
+            currentChatId = getChatId(currentUser.email, friendEmail);
+            
+            // UI Update
+            document.getElementById('empty-chat').style.display = 'none';
+            document.getElementById('active-chat').style.display = 'flex';
+            document.getElementById('chat-friend-name').innerText = friendName;
+            document.getElementById('chat-friend-email').innerText = friendEmail;
+
+            // Purani chat listener band karein (agar koi pehle se khuli thi)
+            if (unsubscribeChat) unsubscribeChat();
+
+            // Nayi chat load karna
+            const chatArea = document.getElementById('chat-area');
+            unsubscribeChat = db.collection("private_chats").doc(currentChatId).collection("messages").orderBy("timestamp")
+            .onSnapshot((snapshot) => {
+                chatArea.innerHTML = '';
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const isMe = data.sender === currentUser.email;
+                    const msgClass = isMe ? 'sent' : 'received';
+                    
+                    let timeString = 'Sending...';
+                    if(data.timestamp) {
+                        const date = data.timestamp.toDate();
+                        timeString = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    }
+
+                    chatArea.innerHTML += `
+                        <div class="message ${msgClass}">
+                            ${data.text}
+                            <span class="msg-time">${timeString}</span>
+                        </div>
+                    `;
+                });
+                chatArea.scrollTop = chatArea.scrollHeight; // Auto scroll to bottom
+            });
+        }
+
+        // Private Message Bhejna
         function sendMessage() {
-            const text = msgInput.value.trim();
-            if (text !== "" && currentUser) {
-                db.collection("messages").add({
+            const text = document.getElementById('msg-input').value.trim();
+            if (text !== "" && currentChatId) {
+                db.collection("private_chats").doc(currentChatId).collection("messages").add({
                     text: text,
                     sender: currentUser.email,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                msgInput.value = '';
+                document.getElementById('msg-input').value = '';
             }
         }
 
         function handleKeyPress(e) {
             if (e.key === 'Enter') sendMessage();
         }
-
-        // Auth State & Real-time Chat Fetching
-        auth.onAuthStateChanged((user) => {
-            if (user) {
-                currentUser = user;
-                loginScreen.classList.add('hidden');
-                chatScreen.classList.remove('hidden');
-                
-                const name = user.email.split('@')[0];
-                document.getElementById('display-name').innerText = name.toUpperCase();
-
-                // लाइव मैसेज लोड करना
-                db.collection("messages").orderBy("timestamp")
-                .onSnapshot((snapshot) => {
-                    try {
-                        chatArea.innerHTML = '';
-                        snapshot.forEach((doc) => {
-                            const data = doc.data();
-                            const isMe = data.sender === currentUser.email;
-                            const msgClass = isMe ? 'sent' : 'received';
-                            const senderName = isMe ? 'You' : data.sender.split('@')[0];
-                            
-                            let timeString = 'Sending...';
-                            if(data.timestamp) {
-                                const date = data.timestamp.toDate();
-                                timeString = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                            }
-
-                            chatArea.innerHTML += `
-                                <div class="message ${msgClass}">
-                                    ${!isMe ? `<span class="msg-sender">${senderName}</span>` : ''}
-                                    ${data.text}
-                                    <span class="msg-time">${timeString}</span>
-                                </div>
-                            `;
-                        });
-                        chatArea.scrollTop = chatArea.scrollHeight;
-                    } catch (e) {
-                        console.error("चैट रेंडर करने में एरर:", e);
-                    }
-                }, (error) => {
-                    console.error("डेटाबेस एरर:", error);
-                    alert("डेटाबेस से कनेक्ट करने में एरर! कृपया कंसोल में Firestore चालू करें।");
-                });
-
-            } else {
-                currentUser = null;
-                chatScreen.classList.add('hidden');
-                loginScreen.classList.remove('hidden');
-                statusMsg.innerText = "लॉगिन करें या नया अकाउंट बनाएं";
-                document.getElementById('email').value = '';
-                document.getElementById('password').value = '';
-            }
-        });
     </script>
 </body>
 </html>
