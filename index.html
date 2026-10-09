@@ -10,7 +10,6 @@
     <!-- Firebase Libraries -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-    <!-- Firestore Library for Live Chat -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
     <style>
@@ -20,14 +19,15 @@
         /* Login/Signup Screen */
         #login-screen { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; }
         #login-screen h2 { color: #075e54; margin-bottom: 20px; font-size: 2rem; }
-        .input-box { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
+        .input-box { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; outline: none; }
         .btn { background: #128C7E; color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; font-size: 1.1rem; cursor: pointer; transition: 0.3s; margin-top: 10px; font-weight: 600; }
         .btn:hover { background: #075e54; }
         .btn-signup { background: #34b7f1; }
         .btn-signup:hover { background: #2a94c4; }
 
-        /* Chat Screen */
-        #chat-screen { display: none; width: 100%; max-width: 900px; height: 90vh; background: white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; flex-direction: column; }
+        /* Chat Screen (CSS Fixed Here) */
+        #chat-screen { width: 100%; max-width: 900px; height: 90vh; background: white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column; }
+        
         .chat-header { background: #075e54; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
         .chat-header .user-info { display: flex; align-items: center; gap: 15px; }
         .chat-header img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; }
@@ -35,7 +35,6 @@
         
         .chat-area { flex: 1; background: #efe7dd url('https://www.transparenttextures.com/patterns/cubes.png'); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
         
-        /* Message Bubbles */
         .message { max-width: 60%; padding: 10px 15px; border-radius: 10px; font-size: 0.95rem; position: relative; clear: both; word-wrap: break-word; }
         .message.received { background: white; align-self: flex-start; border-top-left-radius: 0; }
         .message.sent { background: #dcf8c6; align-self: flex-end; border-top-right-radius: 0; }
@@ -87,7 +86,7 @@
     </div>
 
     <script>
-        // आपके प्रोजेक्ट का Firebase Config
+        // आपकी असली Firebase Config
         const firebaseConfig = {
             apiKey: "AIzaSyBrqb-PgLn6o_lCpjZ5S4m0njY_e4N6qPw",
             authDomain: "web-chat-1fc92.firebaseapp.com",
@@ -112,7 +111,6 @@
 
         let currentUser = null;
 
-        // 1. Sign Up
         function signUpUser() {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
@@ -121,24 +119,21 @@
             auth.createUserWithEmailAndPassword(email, password).catch(err => statusMsg.innerText = err.message);
         }
 
-        // 2. Log In
         function loginUser() {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
+            if(!email || !password) return alert("कृपया ईमेल और पासवर्ड भरें!");
             statusMsg.innerText = "लॉगिन हो रहा है...";
             auth.signInWithEmailAndPassword(email, password).catch(err => statusMsg.innerText = "ईमेल या पासवर्ड गलत है!");
         }
 
-        // 3. Log Out
         function logoutUser() {
             auth.signOut();
         }
 
-        // 4. Send Message to Firestore
         function sendMessage() {
             const text = msgInput.value.trim();
             if (text !== "" && currentUser) {
-                // डेटाबेस में मैसेज सेव करना
                 db.collection("messages").add({
                     text: text,
                     sender: currentUser.email,
@@ -152,7 +147,7 @@
             if (e.key === 'Enter') sendMessage();
         }
 
-        // 5. Auth State & Real-time Chat Fetching
+        // Auth State & Real-time Chat Fetching
         auth.onAuthStateChanged((user) => {
             if (user) {
                 currentUser = user;
@@ -160,38 +155,40 @@
                 chatScreen.classList.remove('hidden');
                 
                 const name = user.email.split('@')[0];
-                document.getElementById('display-name').innerText = name;
+                document.getElementById('display-name').innerText = name.toUpperCase();
 
                 // लाइव मैसेज लोड करना
                 db.collection("messages").orderBy("timestamp")
                 .onSnapshot((snapshot) => {
-                    chatArea.innerHTML = '';
-                    snapshot.forEach((doc) => {
-                        const data = doc.data();
-                        const isMe = data.sender === currentUser.email;
-                        const msgClass = isMe ? 'sent' : 'received';
-                        const senderName = isMe ? 'You' : data.sender.split('@')[0];
-                        
-                        // टाइम फॉर्मेट करना
-                        let timeString = '';
-                        if(data.timestamp) {
-                            const date = data.timestamp.toDate();
-                            timeString = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                        } else {
-                            timeString = 'Sending...';
-                        }
+                    try {
+                        chatArea.innerHTML = '';
+                        snapshot.forEach((doc) => {
+                            const data = doc.data();
+                            const isMe = data.sender === currentUser.email;
+                            const msgClass = isMe ? 'sent' : 'received';
+                            const senderName = isMe ? 'You' : data.sender.split('@')[0];
+                            
+                            let timeString = 'Sending...';
+                            if(data.timestamp) {
+                                const date = data.timestamp.toDate();
+                                timeString = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                            }
 
-                        // मैसेज को स्क्रीन पर दिखाना
-                        chatArea.innerHTML += `
-                            <div class="message ${msgClass}">
-                                ${!isMe ? `<span class="msg-sender">${senderName}</span>` : ''}
-                                ${data.text}
-                                <span class="msg-time">${timeString}</span>
-                            </div>
-                        `;
-                    });
-                    // स्क्रॉल को हमेशा नीचे रखना
-                    chatArea.scrollTop = chatArea.scrollHeight;
+                            chatArea.innerHTML += `
+                                <div class="message ${msgClass}">
+                                    ${!isMe ? `<span class="msg-sender">${senderName}</span>` : ''}
+                                    ${data.text}
+                                    <span class="msg-time">${timeString}</span>
+                                </div>
+                            `;
+                        });
+                        chatArea.scrollTop = chatArea.scrollHeight;
+                    } catch (e) {
+                        console.error("चैट रेंडर करने में एरर:", e);
+                    }
+                }, (error) => {
+                    console.error("डेटाबेस एरर:", error);
+                    alert("डेटाबेस से कनेक्ट करने में एरर! कृपया कंसोल में Firestore चालू करें।");
                 });
 
             } else {
