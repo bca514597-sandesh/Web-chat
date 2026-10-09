@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rathore Chat - Live Messaging</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <!-- Firestore Library for Live Chat -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+        body { background: #e5ddd5; height: 100vh; display: flex; justify-content: center; align-items: center; }
+
+        /* Login/Signup Screen */
+        #login-screen { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; }
+        #login-screen h2 { color: #075e54; margin-bottom: 20px; font-size: 2rem; }
+        .input-box { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
+        .btn { background: #128C7E; color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; font-size: 1.1rem; cursor: pointer; transition: 0.3s; margin-top: 10px; font-weight: 600; }
+        .btn:hover { background: #075e54; }
+        .btn-signup { background: #34b7f1; }
+        .btn-signup:hover { background: #2a94c4; }
+
+        /* Chat Screen */
+        #chat-screen { display: none; width: 100%; max-width: 900px; height: 90vh; background: white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; flex-direction: column; }
+        .chat-header { background: #075e54; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .chat-header .user-info { display: flex; align-items: center; gap: 15px; }
+        .chat-header img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; }
+        .logout-btn { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; }
+        
+        .chat-area { flex: 1; background: #efe7dd url('https://www.transparenttextures.com/patterns/cubes.png'); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Message Bubbles */
+        .message { max-width: 60%; padding: 10px 15px; border-radius: 10px; font-size: 0.95rem; position: relative; clear: both; word-wrap: break-word; }
+        .message.received { background: white; align-self: flex-start; border-top-left-radius: 0; }
+        .message.sent { background: #dcf8c6; align-self: flex-end; border-top-right-radius: 0; }
+        .msg-sender { font-size: 0.75rem; font-weight: bold; color: #075e54; margin-bottom: 3px; display: block; text-transform: capitalize; }
+        .msg-time { font-size: 0.7rem; color: #888; display: block; text-align: right; margin-top: 5px; }
+
+        .input-area { background: #f0f0f0; padding: 15px; display: flex; align-items: center; gap: 15px; }
+        .input-area input { flex: 1; padding: 12px 20px; border: none; border-radius: 25px; font-size: 1rem; outline: none; }
+        .send-btn { background: #128C7E; color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; }
+        
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <h2><i class="fas fa-comments"></i> Rathore Chat</h2>
+        <p style="color: #666; margin-bottom: 20px;" id="status-msg">लॉगिन करें या नया अकाउंट बनाएं</p>
+        
+        <input type="email" id="email" class="input-box" placeholder="ईमेल आईडी">
+        <input type="password" id="password" class="input-box" placeholder="पासवर्ड (कम से कम 6 अक्षर)">
+        
+        <button class="btn" onclick="loginUser()">लॉगिन करें</button>
+        <button class="btn btn-signup" onclick="signUpUser()">नया अकाउंट बनाएं</button>
+    </div>
+
+    <!-- Chat Screen -->
+    <div id="chat-screen" class="hidden">
+        <div class="chat-header">
+            <div class="user-info">
+                <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="User">
+                <div>
+                    <h3 id="display-name">Loading...</h3>
+                    <p style="font-size: 0.8rem; color: #ddd;">ऑनलाइन</p>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logoutUser()" title="लॉगआउट"><i class="fas fa-sign-out-alt"></i></button>
+        </div>
+
+        <div class="chat-area" id="chat-area">
+            <!-- लाइव मैसेजेस यहाँ आएंगे -->
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="msg-input" placeholder="मैसेज टाइप करें..." onkeypress="handleKeyPress(event)">
+            <button class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <script>
+        // आपके प्रोजेक्ट का Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBrqb-PgLn6o_lCpjZ5S4m0njY_e4N6qPw",
+            authDomain: "web-chat-1fc92.firebaseapp.com",
+            projectId: "web-chat-1fc92",
+            storageBucket: "web-chat-1fc92.firebasestorage.app",
+            messagingSenderId: "701338081272",
+            appId: "1:701338081272:web:aa0e2251e2869c9fd7e80d",
+            measurementId: "G-B9M5W7DPP1"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // UI Elements
+        const loginScreen = document.getElementById('login-screen');
+        const chatScreen = document.getElementById('chat-screen');
+        const statusMsg = document.getElementById('status-msg');
+        const chatArea = document.getElementById('chat-area');
+        const msgInput = document.getElementById('msg-input');
+
+        let currentUser = null;
+
+        // 1. Sign Up
+        function signUpUser() {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+            if(!email || !password) return alert("कृपया ईमेल और पासवर्ड भरें!");
+            statusMsg.innerText = "अकाउंट बन रहा है...";
+            auth.createUserWithEmailAndPassword(email, password).catch(err => statusMsg.innerText = err.message);
+        }
+
+        // 2. Log In
+        function loginUser() {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+            statusMsg.innerText = "लॉगिन हो रहा है...";
+            auth.signInWithEmailAndPassword(email, password).catch(err => statusMsg.innerText = "ईमेल या पासवर्ड गलत है!");
+        }
+
+        // 3. Log Out
+        function logoutUser() {
+            auth.signOut();
+        }
+
+        // 4. Send Message to Firestore
+        function sendMessage() {
+            const text = msgInput.value.trim();
+            if (text !== "" && currentUser) {
+                // डेटाबेस में मैसेज सेव करना
+                db.collection("messages").add({
+                    text: text,
+                    sender: currentUser.email,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                msgInput.value = '';
+            }
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+
+        // 5. Auth State & Real-time Chat Fetching
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                currentUser = user;
+                loginScreen.classList.add('hidden');
+                chatScreen.classList.remove('hidden');
+                
+                const name = user.email.split('@')[0];
+                document.getElementById('display-name').innerText = name;
+
+                // लाइव मैसेज लोड करना
+                db.collection("messages").orderBy("timestamp")
+                .onSnapshot((snapshot) => {
+                    chatArea.innerHTML = '';
+                    snapshot.forEach((doc) => {
+                        const data = doc.data();
+                        const isMe = data.sender === currentUser.email;
+                        const msgClass = isMe ? 'sent' : 'received';
+                        const senderName = isMe ? 'You' : data.sender.split('@')[0];
+                        
+                        // टाइम फॉर्मेट करना
+                        let timeString = '';
+                        if(data.timestamp) {
+                            const date = data.timestamp.toDate();
+                            timeString = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        } else {
+                            timeString = 'Sending...';
+                        }
+
+                        // मैसेज को स्क्रीन पर दिखाना
+                        chatArea.innerHTML += `
+                            <div class="message ${msgClass}">
+                                ${!isMe ? `<span class="msg-sender">${senderName}</span>` : ''}
+                                ${data.text}
+                                <span class="msg-time">${timeString}</span>
+                            </div>
+                        `;
+                    });
+                    // स्क्रॉल को हमेशा नीचे रखना
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                });
+
+            } else {
+                currentUser = null;
+                chatScreen.classList.add('hidden');
+                loginScreen.classList.remove('hidden');
+                statusMsg.innerText = "लॉगिन करें या नया अकाउंट बनाएं";
+                document.getElementById('email').value = '';
+                document.getElementById('password').value = '';
+            }
+        });
+    </script>
+</body>
+</html>
