@@ -161,6 +161,7 @@
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
+        db.settings({ experimentalAutoDetectLongPolling: true, merge: true });
 
         // ===== State =====
         let myEmail = null;            // hamesha lowercase
@@ -168,6 +169,9 @@
         let currentFriendEmail = null;
         let unsubscribeChat = null;
         let unsubscribeContacts = null;
+        let unsubscribeIncoming = null;
+        let contactsMap = {};
+        let incomingMap = {};
 
         const $ = (id) => document.getElementById(id);
         const appContainer = $('app-container');
@@ -240,6 +244,8 @@
                 myEmail = null;
                 if (unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
                 if (unsubscribeContacts) { unsubscribeContacts(); unsubscribeContacts = null; }
+                if (unsubscribeIncoming) { unsubscribeIncoming(); unsubscribeIncoming = null; }
+                contactsMap = {}; incomingMap = {};
                 resetChatView();
                 $('contact-list').innerHTML = '';
                 $('password').value = '';
@@ -263,6 +269,13 @@
                     email: friendEmail,
                     name: friendName
                 });
+                // Dost ki list mein bhi hamein dikhao, taaki wo chat dekh sake
+                try {
+                    await db.collection('users').doc(friendEmail).collection('incoming').doc(myEmail).set({
+                        email: myEmail,
+                        name: myEmail.split('@')[0]
+                    });
+                } catch (e) { console.warn('incoming write failed', e); }
                 alert(friendName + ' add ho gaya!');
             } catch (err) {
                 console.error(err);
@@ -270,50 +283,68 @@
             }
         }
 
+        function renderContacts() {
+            const list = $('contact-list');
+            list.innerHTML = '';
+
+            // Jinhone mujhe add kiya (incoming) + jinhe maine add kiya (contacts, naam isi ka chalega)
+            const all = Object.assign({}, incomingMap, contactsMap);
+            const contacts = Object.values(all);
+
+            if (contacts.length === 0) {
+                const empty = document.createElement('li');
+                empty.className = 'no-contacts';
+                empty.textContent = 'Abhi koi dost nahi hai. Upar + dabakar dost jodein.';
+                list.appendChild(empty);
+                return;
+            }
+
+            contacts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            contacts.forEach((contact) => {
+                const li = document.createElement('li');
+                li.className = 'contact-item';
+                if (contact.email === currentFriendEmail) li.classList.add('active');
+
+                const img = document.createElement('img');
+                img.src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+                img.alt = '';
+
+                const info = document.createElement('div');
+                info.className = 'contact-info';
+                const h4 = document.createElement('h4');
+                h4.textContent = contact.name;
+                const p = document.createElement('p');
+                p.textContent = contact.email;
+                info.append(h4, p);
+
+                li.append(img, info);
+                li.addEventListener('click', () => openChat(contact.email, contact.name));
+                list.appendChild(li);
+            });
+        }
+
         function loadContacts() {
             if (unsubscribeContacts) unsubscribeContacts();
-            unsubscribeContacts = db.collection('users').doc(myEmail).collection('contacts')
-                .onSnapshot((snapshot) => {
-                    const list = $('contact-list');
-                    list.innerHTML = '';
+            if (unsubscribeIncoming) unsubscribeIncoming();
+            contactsMap = {}; incomingMap = {};
 
-                    if (snapshot.empty) {
-                        const empty = document.createElement('li');
-                        empty.className = 'no-contacts';
-                        empty.textContent = 'Abhi koi dost nahi hai. Upar + dabakar dost jodein.';
-                        list.appendChild(empty);
-                        return;
-                    }
+            const userDoc = db.collection('users').doc(myEmail);
+            const onErr = (err) => {
+                console.error(err);
+                alert('Contacts load nahi hue (' + err.code + '). Firestore Rules check karein.');
+            };
 
-                    const contacts = [];
-                    snapshot.forEach((d) => contacts.push(d.data()));
-                    contacts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            unsubscribeContacts = userDoc.collection('contacts').onSnapshot((snap) => {
+                contactsMap = {};
+                snap.forEach((d) => { contactsMap[d.id] = d.data(); });
+                renderContacts();
+            }, onErr);
 
-                    contacts.forEach((contact) => {
-                        const li = document.createElement('li');
-                        li.className = 'contact-item';
-                        if (contact.email === currentFriendEmail) li.classList.add('active');
-
-                        const img = document.createElement('img');
-                        img.src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
-                        img.alt = '';
-
-                        const info = document.createElement('div');
-                        info.className = 'contact-info';
-                        const h4 = document.createElement('h4');
-                        h4.textContent = contact.name;
-                        const p = document.createElement('p');
-                        p.textContent = contact.email;
-                        info.append(h4, p);
-
-                        li.append(img, info);
-                        li.addEventListener('click', () => openChat(contact.email, contact.name));
-                        list.appendChild(li);
-                    });
-                }, (err) => {
-                    console.error(err);
-                    alert('Contacts load nahi hue. Firestore Rules check karein.');
-                });
+            unsubscribeIncoming = userDoc.collection('incoming').onSnapshot((snap) => {
+                incomingMap = {};
+                snap.forEach((d) => { incomingMap[d.id] = d.data(); });
+                renderContacts();
+            }, onErr);
         }
 
         // ===== Chat =====
@@ -369,7 +400,7 @@
                     chatArea.scrollTop = chatArea.scrollHeight;
                 }, (err) => {
                     console.error(err);
-                    chatArea.textContent = 'Messages load nahi hue. Firestore Rules check karein.';
+                    chatArea.textContent = 'Messages load nahi hue (' + err.code + '). Firestore Rules check karein.';
                 });
 
             if (window.innerWidth > 768) $('msg-input').focus();
@@ -401,7 +432,7 @@
             } catch (err) {
                 console.error(err);
                 input.value = text;
-                alert('Message nahi gaya. Internet ya Firestore Rules check karein.');
+                alert('Message nahi gaya (' + err.code + '). Internet ya Firestore Rules check karein.');
             }
         }
 
