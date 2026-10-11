@@ -4,87 +4,171 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="वेब चैट (Web Chat) - सुरक्षित और प्राइवेट मैसेंजर।">
+    <meta name="keywords" content="वेब चैट, Web Chat, Rathore Chat">
     <title>वेब चैट - Rathore Private Messenger</title>
+
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase Libraries -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Roboto', sans-serif; }
         html, body { height: 100%; background: #f0f2f5; }
+        
         .hidden { display: none !important; }
 
+        /* ---------- Login Screen ---------- */
         #login-screen { background: #fff; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,.1); text-align: center; width: 90%; max-width: 400px; margin: 50px auto; }
         #login-screen h2 { color: #000; margin-bottom: 20px; font-size: 2rem; }
         .input-box { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; outline: none; }
         .btn { background: #000; color: #fff; border: none; padding: 12px; width: 100%; border-radius: 8px; font-size: 1.05rem; cursor: pointer; margin-top: 10px; font-weight: 600; }
-        .btn:disabled { opacity: .6; cursor: not-allowed; }
         .btn.secondary { background: #fff; color: #000; border: 1px solid #000; }
-        #auth-error { color: #d9534f; font-size: .9rem; margin-top: 4px; min-height: 1.3em; }
+        #auth-error { color: #d9534f; font-size: .9rem; margin-top: 4px; }
 
-        #app-container { width: 100%; max-width: 1200px; height: 100vh; height: 100dvh; background: #fff; display: flex; overflow: hidden; margin: 0 auto; box-shadow: 0 0 10px rgba(0,0,0,.05); }
+        /* ---------- App Container ---------- */
+        #app-container { width: 100%; max-width: 1200px; height: 100vh; background: #fff; display: flex; overflow: hidden; margin: 0 auto; box-shadow: 0 0 10px rgba(0,0,0,0.05); position: relative; }
 
+        /* ================= SIDEBAR ================= */
         #sidebar { width: 35%; min-width: 320px; background: #fff; border-right: 1px solid #e9edef; display: flex; flex-direction: column; position: relative; }
-        .wa-top-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px 10px; }
-        .wa-top-header h2 { font-size: 1.5rem; font-weight: 700; color: #111b21; }
-        .wa-top-icons { display: flex; gap: 20px; color: #111b21; font-size: 1.2rem; }
-        .wa-top-icons i { cursor: pointer; }
-        .wa-search-container { padding: 0 15px 10px; }
+        
+        .wa-top-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px 10px; background: #fff; }
+        .wa-top-header h2 { font-size: 1.5rem; font-weight: 700; color: #111b21; display: flex; align-items: center; gap: 10px; }
+        
+        .header-profile-img { width: 35px; height: 35px; border-radius: 50%; object-fit: cover; cursor: pointer; }
+        .header-profile-name { font-size: 1.2rem; font-weight: 600; color: #111b21; }
+        
+        .wa-top-icons { display: flex; gap: 20px; color: #111b21; font-size: 1.2rem; cursor: pointer; align-items: center; }
+        
+        .wa-search-container { padding: 0 15px 10px; background: #fff; }
         .wa-search-box { background: #f0f2f5; border-radius: 30px; display: flex; align-items: center; padding: 8px 15px; height: 40px; }
-        .wa-search-box i { color: #54656f; font-size: .9rem; margin-right: 15px; }
-        .wa-search-box input { border: none; background: transparent; outline: none; width: 100%; font-size: .95rem; color: #111b21; }
-        .wa-filters { display: flex; gap: 8px; padding: 0 15px 10px; overflow-x: auto; border-bottom: 1px solid #e9edef; white-space: nowrap; }
+        .wa-search-box i { color: #54656f; font-size: 0.9rem; margin-right: 15px; }
+        .wa-search-box input { border: none; background: transparent; outline: none; width: 100%; font-size: 0.95rem; color: #111b21; }
+        
+        .wa-filters { display: flex; gap: 8px; padding: 0 15px 10px; overflow-x: auto; background: #fff; border-bottom: 1px solid #e9edef; white-space: nowrap; }
         .wa-filters::-webkit-scrollbar { display: none; }
-        .wa-chip { background: #f0f2f5; color: #54656f; padding: 6px 14px; border-radius: 20px; font-size: .9rem; cursor: pointer; font-weight: 500; }
+        .wa-chip { background: #f0f2f5; color: #54656f; padding: 6px 14px; border-radius: 20px; font-size: 0.9rem; cursor: pointer; font-weight: 500; }
         .wa-chip.active { background: #fce8e8; color: #e91e63; }
-
-        .contact-list { flex: 1; overflow-y: auto; list-style: none; padding-bottom: 150px; }
-        .contact-item { padding: 12px 15px; display: flex; align-items: center; cursor: pointer; transition: .2s; }
+        
+        .contact-list { flex: 1; overflow-y: auto; list-style: none; background: #fff; padding-bottom: 140px; }
+        .contact-item { padding: 12px 15px; display: flex; align-items: center; cursor: pointer; transition: 0.2s; }
         .contact-item:hover, .contact-item.active { background: #f5f6f6; }
-        .contact-item img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; margin-right: 15px; flex-shrink: 0; }
-        .contact-details { flex: 1; min-width: 0; border-bottom: 1px solid #f2f2f2; padding-bottom: 12px; }
-        .contact-name { display: block; font-size: 1.05rem; font-weight: 500; color: #111b21; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 3px; }
-        .contact-sub { display: block; font-size: .85rem; color: #667781; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .no-contacts { padding: 30px 20px; text-align: center; color: #667781; font-size: .9rem; }
-
-        .wa-fab { position: absolute; bottom: 80px; right: 20px; width: 50px; height: 50px; background: #e91e63; color: #fff; border-radius: 14px; display: flex; justify-content: center; align-items: center; font-size: 1.5rem; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(233,30,99,.3); z-index: 10; }
+        .contact-item img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; margin-right: 15px; }
+        
+        .contact-details { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; border-bottom: 1px solid #f2f2f2; padding-bottom: 12px; }
+        .contact-row-1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+        .contact-name { font-size: 1.05rem; font-weight: 500; color: #111b21; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .contact-time { font-size: 0.75rem; color: #667781; }
+        
+        .contact-row-2 { display: flex; justify-content: space-between; align-items: center; }
+        .contact-last-msg { font-size: 0.85rem; color: #667781; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+        
+        .wa-fab { position: absolute; bottom: 80px; right: 20px; width: 50px; height: 50px; background: #e91e63; color: white; border-radius: 14px; display: flex; justify-content: center; align-items: center; font-size: 1.5rem; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(233, 30, 99, 0.3); z-index: 10; }
+        
         .wa-bottom-nav { position: absolute; bottom: 0; width: 100%; background: #fff; border-top: 1px solid #e9edef; display: flex; justify-content: space-around; align-items: center; padding: 10px 0; z-index: 10; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; color: #54656f; font-size: .75rem; cursor: pointer; gap: 4px; font-weight: 500; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: #54656f; font-size: 0.75rem; cursor: pointer; gap: 4px; font-weight: 500; }
         .nav-item i { font-size: 1.4rem; padding: 4px 15px; border-radius: 20px; }
         .nav-item.active { color: #111b21; }
         .nav-item.active i { background: #fce8e8; color: #e91e63; }
 
+        /* ================= CHAT WINDOW ================= */
         #chat-window { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #efe7dd url('https://www.transparenttextures.com/patterns/cubes.png'); }
-        #empty-chat { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #f0f2f5; color: #667781; text-align: center; padding: 20px; }
-        #active-chat { display: none; flex: 1; min-height: 0; flex-direction: column; }
+        #empty-chat { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #f0f2f5; color: #667781; text-align: center; }
+        
+        #active-chat { display: none; flex: 1; flex-direction: column; }
         .chat-header { background: #f0f2f5; padding: 10px 15px; display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #e9edef; }
-        .chat-header img { width: 40px; height: 40px; border-radius: 50%; }
-        .chat-header-info { min-width: 0; }
+        .chat-header img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
         .chat-header-info h3 { font-size: 1rem; color: #111b21; font-weight: 500; }
-        .chat-header-info p { font-size: .8rem; color: #667781; }
+        .chat-header-info p { font-size: 0.8rem; color: #667781; }
         #back-btn { display: none; background: none; border: none; font-size: 1.2rem; color: #54656f; cursor: pointer; margin-right: 5px; }
 
         .chat-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-        .message { max-width: 75%; padding: 8px 12px; border-radius: 8px; font-size: .95rem; color: #111b21; overflow-wrap: anywhere; white-space: pre-wrap; box-shadow: 0 1px .5px rgba(11,20,26,.13); }
+        .message { max-width: 75%; padding: 8px 12px; border-radius: 8px; font-size: 0.95rem; color: #111b21; position: relative; word-wrap: break-word; box-shadow: 0 1px 0.5px rgba(11,20,26,.13); }
         .message.received { background: #fff; align-self: flex-start; border-top-left-radius: 0; }
         .message.sent { background: #d9fdd3; align-self: flex-end; border-top-right-radius: 0; }
-        .msg-time { font-size: .65rem; color: #667781; float: right; margin: 8px 0 -5px 10px; }
+        .msg-time { font-size: 0.65rem; color: #667781; float: right; margin: 8px 0 -5px 10px; }
 
         .input-area { background: #f0f2f5; padding: 10px 15px; display: flex; align-items: center; gap: 10px; }
-        .input-area input { flex: 1; min-width: 0; padding: 12px 15px; border: none; border-radius: 8px; font-size: .95rem; outline: none; background: #fff; }
+        .input-area input[type="text"] { flex: 1; padding: 12px 15px; border: none; border-radius: 8px; font-size: 0.95rem; outline: none; background: #fff; }
         .send-btn { background: #00a884; color: #fff; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; }
 
-        #toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: #111b21; color: #fff; padding: 10px 18px; border-radius: 20px; font-size: .9rem; opacity: 0; pointer-events: none; transition: .3s; z-index: 50; }
+        /* ================= DARK MODE THEME ================= */
+        body.dark-theme #app-container, body.dark-theme #sidebar, body.dark-theme .wa-top-header, body.dark-theme .wa-search-container, body.dark-theme .wa-filters, body.dark-theme .contact-list { background: #111b21; color: #e9edef; }
+        body.dark-theme .wa-top-header h2, body.dark-theme .header-profile-name, body.dark-theme .contact-name { color: #e9edef; }
+        body.dark-theme .wa-top-icons { color: #e9edef; }
+        body.dark-theme .wa-search-box { background: #202c33; }
+        body.dark-theme .wa-search-box input { color: #e9edef; }
+        body.dark-theme .wa-chip { background: #202c33; color: #8696a0; }
+        body.dark-theme .wa-chip.active { background: #374045; color: #00a884; }
+        body.dark-theme .contact-item:hover { background: #202c33; border-bottom-color: #202c33; }
+        body.dark-theme .wa-bottom-nav { background: #111b21; border-top: 1px solid #202c33; }
+        body.dark-theme .nav-item { color: #8696a0; }
+        body.dark-theme .nav-item.active { color: #00a884; }
+        body.dark-theme .nav-item.active i { background: #202c33; color: #00a884; }
+        body.dark-theme #settings-modal > div { background: #111b21; border: 1px solid #202c33; }
+        body.dark-theme #settings-modal h3 { color: #e9edef; }
+        body.dark-theme .btn.secondary { background: #202c33; color: #e9edef; border: none; }
+        body.dark-theme #chat-window { background: #0b141a url('https://www.transparenttextures.com/patterns/cubes.png'); }
+        body.dark-theme .chat-header { background: #202c33; border-bottom: 1px solid #111b21; }
+        body.dark-theme .chat-header-info h3 { color: #e9edef; }
+        body.dark-theme .input-area { background: #202c33; }
+        body.dark-theme .input-area input { background: #2a3942; color: #e9edef; }
+        body.dark-theme .message.received { background: #202c33; color: #e9edef; }
+        body.dark-theme .message.sent { background: #005c4b; color: #e9edef; }
+
+        /* ===== Fixes ===== */
+        .modal { position: absolute; inset: 0; background: rgba(0,0,0,.5); z-index: 100; display: flex; justify-content: center; align-items: center; }
+        .modal > div { background: #fff; padding: 30px; border-radius: 15px; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,.1); border: 1px solid #e9edef; }
+        #settings-modal h3 { color: #111b21; }
+        .message { overflow-wrap: anywhere; white-space: pre-wrap; }
+        .message img { display: block; max-width: 100%; max-height: 320px; }
+        .no-contacts { padding: 30px 20px; text-align: center; color: #667781; font-size: .9rem; }
+        #toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: #111b21; color: #fff; padding: 10px 18px; border-radius: 20px; font-size: .9rem; opacity: 0; pointer-events: none; transition: .3s; z-index: 200; }
         #toast.show { opacity: 1; }
+        body.dark-theme { background: #0b141a; }
+        body.dark-theme .contact-item.active { background: #2a3942; }
+        body.dark-theme .contact-details { border-bottom-color: #202c33; }
+        body.dark-theme .contact-last-msg, body.dark-theme .chat-header-info p, body.dark-theme .no-contacts { color: #8696a0; }
+        body.dark-theme #empty-chat { background: #222e35; color: #8696a0; }
+        body.dark-theme #empty-chat h2 { color: #e9edef !important; }
+        body.dark-theme #back-btn { color: #8696a0; }
+
+        /* ===== Splash, groups, emoji, settings ===== */
+        #splash { position: fixed; inset: 0; background: #fff; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity .5s; }
+        #splash.out { opacity: 0; pointer-events: none; }
+        .splash-logo { width: 96px; height: 96px; border-radius: 50%; background: #e91e63; color: #fff; font-size: 3rem; display: flex; align-items: center; justify-content: center; animation: pop .8s ease; }
+        #splash h1 { margin-top: 18px; font-size: 1.6rem; color: #111b21; font-weight: 500; }
+        .splash-from { position: absolute; bottom: 40px; text-align: center; color: #667781; font-size: .85rem; }
+        .splash-from b { display: block; color: #e91e63; font-size: 1.1rem; letter-spacing: .5px; margin-top: 2px; }
+        @keyframes pop { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        body.dark-theme #splash { background: #111b21; }
+        body.dark-theme #splash h1 { color: #e9edef; }
+        .hd-btn { color: #54656f; cursor: pointer; font-size: 1.15rem; padding: 6px; }
+        #fav-btn { margin-left: auto; }
+        .hd-btn.on { color: #f5b301; }
+        .chat-header-info { min-width: 0; }
+        .chat-header-info p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #emoji-panel { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; padding: 10px; background: #f0f2f5; border-top: 1px solid #e9edef; max-height: 170px; overflow-y: auto; }
+        #emoji-panel span { font-size: 1.5rem; text-align: center; cursor: pointer; padding: 4px; border-radius: 8px; }
+        #emoji-panel span:hover { background: #e0e4e8; }
+        body.dark-theme #emoji-panel { background: #202c33; border-color: #111b21; }
+        .badge { background: #e91e63; color: #fff; border-radius: 12px; min-width: 20px; height: 20px; padding: 0 6px; font-size: .6rem; display: flex; align-items: center; justify-content: center; margin-left: 8px; }
+        .contact-item.unread .contact-name { font-weight: 700; }
+        .contact-item.unread .contact-time { color: #e91e63; }
+        .msg-sender { font-size: .75rem; font-weight: 600; color: #e91e63; margin-bottom: 2px; }
+        .modal > div { max-height: 90%; overflow-y: auto; }
+        body.fs-large .message { font-size: 1.15rem; }
+        body.fs-small .message { font-size: .85rem; }
+        body.wp-plain #chat-window { background-image: none; }
 
         @media screen and (max-width: 768px) {
-            #app-container { max-width: none; box-shadow: none; }
+            #app-container { height: 100vh; height: 100dvh; max-width: none; box-shadow: none; border-radius: 0; }
             #sidebar { width: 100%; min-width: 0; border: none; }
             #chat-window { display: none; width: 100%; }
             #back-btn { display: block; }
-            .chat-area { padding: 15px 10px; }
-            .message { max-width: 85%; }
             #app-container.chat-open #sidebar { display: none; }
             #app-container.chat-open #chat-window { display: flex; }
         }
@@ -92,11 +176,17 @@
 </head>
 <body>
 
+    <div id="splash">
+        <div class="splash-logo"><i class="fas fa-comment-dots"></i></div>
+        <h1>Web Chat</h1>
+        <div class="splash-from">from<b>Rathore Gaming Studio</b></div>
+    </div>
+
     <div id="login-screen">
         <h2>Web Chat</h2>
         <p style="color:#666; margin-bottom: 10px;">लॉगिन या साइन अप करें</p>
         <input type="email" id="email" class="input-box" placeholder="Aapki Email ID" autocomplete="email">
-        <input type="password" id="password" class="input-box" placeholder="Password (min 6 letters)" autocomplete="current-password">
+        <input type="password" id="password" class="input-box" placeholder="Password" autocomplete="current-password">
         <p id="auth-error"></p>
         <button class="btn" id="login-btn">Login</button>
         <button class="btn secondary" id="signup-btn">Naya Account Banayein</button>
@@ -105,54 +195,90 @@
     <div id="app-container" class="hidden">
         <div id="sidebar">
             <div class="wa-top-header">
-                <h2>Web Chat</h2>
+                <h2>
+                    <img id="my-dp" src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="header-profile-img" alt="My DP" title="सेटिंग्स के लिए गियर आइकन दबाएं">
+                    <span id="my-name" class="header-profile-name">Me</span>
+                </h2>
                 <div class="wa-top-icons">
-                    <i class="fas fa-camera" data-soon></i>
-                    <i class="fas fa-sign-out-alt" id="logout-btn" title="Logout"></i>
+                    <i class="fas fa-users" id="new-group-btn" title="नया ग्रुप"></i>
+                    <i class="fas fa-cog" id="settings-btn" title="सेटिंग्स"></i>
+                    <i class="fas fa-sign-out-alt" id="logout-btn" title="लॉगआउट"></i>
                 </div>
             </div>
+
             <div class="wa-search-container">
                 <div class="wa-search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="search-input" placeholder="सर्च करें" autocomplete="off">
+                    <input type="text" id="search-input" placeholder="सर्च करें">
                 </div>
             </div>
+
             <div class="wa-filters">
-                <span class="wa-chip active">सभी</span>
-                <span class="wa-chip" data-soon>नहीं पढ़ा</span>
-                <span class="wa-chip" data-soon>पसंदीदा</span>
-                <span class="wa-chip" data-soon>ग्रुप्स</span>
+                <span class="wa-chip active" data-filter="all">सभी</span>
+                <span class="wa-chip" data-filter="unread">नहीं पढ़ा</span>
+                <span class="wa-chip" data-filter="fav">पसंदीदा</span>
+                <span class="wa-chip" data-filter="groups">ग्रुप्स</span>
             </div>
+
             <ul class="contact-list" id="contact-list"></ul>
-            <button class="wa-fab" id="add-friend-btn" title="Dost Jodein"><i class="fas fa-plus"></i></button>
+
+            <button class="wa-fab" id="add-friend-btn"><i class="fas fa-plus"></i></button>
+
             <div class="wa-bottom-nav">
                 <div class="nav-item active"><i class="fas fa-comment"></i><span>चैट</span></div>
-                <div class="nav-item" data-soon><i class="fas fa-sync"></i><span>अपडेट्स</span></div>
-                <div class="nav-item" data-soon><i class="fas fa-users"></i><span>कम्युनिटी</span></div>
-                <div class="nav-item" data-soon><i class="fas fa-phone"></i><span>कॉल्स</span></div>
+                <div class="nav-item"><i class="fas fa-sync"></i><span>अपडेट्स</span></div>
+                <div class="nav-item"><i class="fas fa-users"></i><span>कम्युनिटी</span></div>
+                <div class="nav-item"><i class="fas fa-phone"></i><span>कॉल्स</span></div>
             </div>
         </div>
 
         <div id="chat-window">
             <div id="empty-chat">
-                <h2 style="color:#41525d; font-weight:300;">Web Chat</h2>
-                <p style="margin-top:10px;">Private message bhejne ke liye list se kisi dost ko chunein.</p>
+                <h2 style="color: #41525d; font-weight: 300;">Web Chat</h2>
+                <p style="margin-top: 10px;">Private message bhejne ke liye list se kisi dost ko chunein.</p>
             </div>
+
             <div id="active-chat">
                 <div class="chat-header">
-                    <button id="back-btn" title="Wapas"><i class="fas fa-arrow-left"></i></button>
-                    <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="">
+                    <button id="back-btn"><i class="fas fa-arrow-left"></i></button>
+                    <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="Friend" id="chat-friend-dp">
                     <div class="chat-header-info">
-                        <h3 id="chat-friend-name"></h3>
+                        <h3 id="chat-friend-name">Friend Name</h3>
                         <p id="chat-friend-email"></p>
                     </div>
+                    <i class="fas fa-star hd-btn" id="fav-btn" title="पसंदीदा"></i>
+                    <i class="fas fa-trash hd-btn" id="del-btn" title="दोस्त हटाएँ"></i>
                 </div>
                 <div class="chat-area" id="chat-area"></div>
+                
+                <div id="emoji-panel" class="hidden"></div>
                 <div class="input-area">
-                    <i class="fas fa-smile" data-soon style="font-size:1.5rem; color:#54656f; cursor:pointer;"></i>
-                    <input type="text" id="msg-input" placeholder="मैसेज टाइप करें..." maxlength="2000" autocomplete="off">
-                    <button class="send-btn" id="send-btn" title="Bhejein"><i class="fas fa-paper-plane"></i></button>
+                    <i class="fas fa-smile" id="emoji-btn" style="font-size: 1.5rem; color: #54656f; cursor: pointer;"></i>
+                    
+                    
+                    
+                    <input type="text" id="msg-input" placeholder="मैसेज टाइप करें..." autocomplete="off" style="margin-left: 10px;">
+                    <button class="send-btn" id="send-btn"><i class="fas fa-paper-plane"></i></button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal hidden">
+            <div>
+                <h3 style="margin-bottom: 20px;">⚙️ सेटिंग्स</h3>
+                
+                <img id="settings-dp-preview" src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 15px; border: 2px solid #e91e63;">
+                
+                <button id="update-name-btn" class="btn secondary" style="margin-bottom: 10px;"><i class="fas fa-pen"></i> अपना नाम बदलें</button>
+                <button id="update-dp-btn" class="btn secondary" style="margin-bottom: 15px;"><i class="fas fa-camera"></i> प्रोफाइल फोटो (DP) बदलें</button>
+                
+                <button id="dark-mode-btn" class="btn secondary" style="margin-bottom: 15px;"><i class="fas fa-moon"></i> डार्क मोड चालू करें</button>
+                <button id="sound-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
+                <button id="font-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
+                <button id="wallpaper-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
+                <button id="reset-pw-btn" class="btn secondary" style="margin-bottom: 10px;"><i class="fas fa-key"></i> पासवर्ड बदलने का लिंक भेजें</button>
+                <button id="close-settings" class="btn" style="background: #e91e63; margin-top: 10px;">बंद करें</button>
             </div>
         </div>
     </div>
@@ -173,25 +299,55 @@
         const db = firebase.firestore();
         db.settings({ experimentalAutoDetectLongPolling: true, merge: true });
 
-        let myEmail = null, currentChatId = null, currentFriendEmail = null;
-        let unsubscribeChat = null, unsubscribeContacts = null, unsubscribeIncoming = null;
-        let contactsMap = {}, incomingMap = {}, searchTerm = '', toastTimer;
-
         const $ = (id) => document.getElementById(id);
         const appContainer = $('app-container');
         const AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+        const DEFAULT_ME = 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+        const GROUP_AV = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#e91e63"/><text x="24" y="32" font-size="22" text-anchor="middle">👥</text></svg>');
+        const EMAIL_RE = /^[^\s@|]+@[^\s@|]+\.[^\s@|]+$/;
+        const ts = () => firebase.firestore.FieldValue.serverTimestamp();
+
+        let myEmail = null, current = null;
+        let unsubChat = null, unsubContacts = null, unsubIncoming = null, unsubGroups = null;
+        let contactsMap = {}, incomingMap = {}, groupsMap = {}, lastMap = {}, lastSubs = {};
+        let filter = 'all', searchTerm = '', toastTimer;
 
         const normalizeEmail = (e) => (e || '').trim().toLowerCase();
         const getChatId = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
+        const safeUrl = (u) => (typeof u === 'string' && /^https:\/\//i.test(u)) ? u : null;
+        const store = {
+            get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+            set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+        };
 
         function toast(msg) {
-            const t = $('toast');
-            t.textContent = msg;
-            t.classList.add('show');
-            clearTimeout(toastTimer);
-            toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+            const t = $('toast'); t.textContent = msg; t.classList.add('show');
+            clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
         }
 
+        // ================= SETTINGS / PREFS =================
+        let prefs = Object.assign({ sound: true, fs: 'm', wp: 'pattern', dark: false }, store.get('prefs', {}));
+        function applyPrefs() {
+            const b = document.body.classList;
+            b.toggle('dark-theme', prefs.dark); b.toggle('fs-large', prefs.fs === 'l');
+            b.toggle('fs-small', prefs.fs === 's'); b.toggle('wp-plain', prefs.wp === 'plain');
+            $('dark-mode-btn').innerHTML = prefs.dark ? '<i class="fas fa-sun"></i> लाइट मोड चालू करें' : '<i class="fas fa-moon"></i> डार्क मोड चालू करें';
+            $('sound-btn').innerHTML = prefs.sound ? '<i class="fas fa-bell"></i> नोटिफ़िकेशन साउंड: चालू' : '<i class="fas fa-bell-slash"></i> नोटिफ़िकेशन साउंड: बंद';
+            $('font-btn').innerHTML = '<i class="fas fa-font"></i> टेक्स्ट साइज़: ' + { s: 'छोटा', m: 'सामान्य', l: 'बड़ा' }[prefs.fs];
+            $('wallpaper-btn').innerHTML = '<i class="fas fa-image"></i> चैट बैकग्राउंड: ' + (prefs.wp === 'plain' ? 'सादा' : 'पैटर्न');
+        }
+        function setPref(k, v) { prefs[k] = v; store.set('prefs', prefs); applyPrefs(); }
+        function beep() {
+            try {
+                const c = new (window.AudioContext || window.webkitAudioContext)();
+                const o = c.createOscillator(), g = c.createGain();
+                o.connect(g); g.connect(c.destination); o.frequency.value = 880;
+                g.gain.setValueAtTime(.15, c.currentTime); g.gain.exponentialRampToValueAtTime(.001, c.currentTime + .25);
+                o.start(); o.stop(c.currentTime + .25);
+            } catch (e) {}
+        }
+
+        // ================= AUTH =================
         function authMessage(code) {
             const map = {
                 'auth/invalid-email': 'Email ID sahi nahi hai.',
@@ -205,37 +361,37 @@
             };
             return map[code] || 'Kuch galat ho gaya. Dobara try karein.';
         }
-
-        function readCreds() {
-            const email = normalizeEmail($('email').value);
-            const password = $('password').value;
-            if (!email || !password) { $('auth-error').textContent = 'Email aur password dalein!'; return null; }
-            $('auth-error').textContent = '';
-            return { email, password };
-        }
-
         async function authAction(fn) {
-            const c = readCreds(); if (!c) return;
+            const email = normalizeEmail($('email').value), password = $('password').value;
+            if (!email || !password) { $('auth-error').textContent = 'Email aur password dalein!'; return; }
+            $('auth-error').textContent = '';
             $('login-btn').disabled = $('signup-btn').disabled = true;
-            try { await fn(c.email, c.password); }
-            catch (err) { $('auth-error').textContent = authMessage(err.code); }
+            try { await fn(email, password); } catch (err) { $('auth-error').textContent = authMessage(err.code); }
             $('login-btn').disabled = $('signup-btn').disabled = false;
         }
         const loginUser = () => authAction((e, p) => auth.signInWithEmailAndPassword(e, p));
         const signUpUser = () => authAction((e, p) => auth.createUserWithEmailAndPassword(e, p));
 
+        function stopAll() {
+            [unsubChat, unsubContacts, unsubIncoming, unsubGroups].forEach((u) => u && u());
+            unsubChat = unsubContacts = unsubIncoming = unsubGroups = null;
+            Object.values(lastSubs).forEach((u) => u()); lastSubs = {};
+        }
+
         auth.onAuthStateChanged((user) => {
+            stopAll();
+            contactsMap = {}; incomingMap = {}; groupsMap = {}; lastMap = {};
             if (user) {
                 myEmail = normalizeEmail(user.email);
                 $('login-screen').classList.add('hidden');
                 appContainer.classList.remove('hidden');
+                $('my-name').textContent = user.displayName || myEmail.split('@')[0].toUpperCase();
+                const dp = safeUrl(user.photoURL) || DEFAULT_ME;
+                $('my-dp').src = dp; $('settings-dp-preview').src = dp;
                 resetChatView();
-                loadContacts();
+                loadData();
             } else {
                 myEmail = null;
-                [unsubscribeChat, unsubscribeContacts, unsubscribeIncoming].forEach((u) => u && u());
-                unsubscribeChat = unsubscribeContacts = unsubscribeIncoming = null;
-                contactsMap = {}; incomingMap = {};
                 resetChatView();
                 $('contact-list').innerHTML = '';
                 $('password').value = '';
@@ -244,158 +400,297 @@
             }
         });
 
+        // ================= DATA =================
+        function loadData() {
+            const userDoc = db.collection('users').doc(myEmail);
+            const onErr = (e) => { console.error(e); toast('Data load nahi hua (' + e.code + ')'); };
+            unsubContacts = userDoc.collection('contacts').onSnapshot((s) => { contactsMap = {}; s.forEach((d) => { contactsMap[d.id] = d.data(); }); refresh(); }, onErr);
+            unsubIncoming = userDoc.collection('incoming').onSnapshot((s) => { incomingMap = {}; s.forEach((d) => { incomingMap[d.id] = d.data(); }); refresh(); }, onErr);
+            unsubGroups = db.collection('groups').where('members', 'array-contains', myEmail).onSnapshot((s) => {
+                groupsMap = {}; s.forEach((d) => { groupsMap[d.id] = Object.assign({ id: d.id }, d.data()); }); refresh();
+            }, (e) => console.warn('groups', e.code));
+        }
+        function refresh() { syncLastListeners(); renderChats(); }
+
+        function entries() {
+            const merged = {}, out = [];
+            Object.keys(incomingMap).forEach((e) => { merged[e] = { email: e, name: incomingMap[e].name || e, photoURL: incomingMap[e].photoURL }; });
+            Object.keys(contactsMap).forEach((e) => { merged[e] = Object.assign({}, merged[e], { email: e, name: contactsMap[e].name }); });
+            Object.values(merged).forEach((c) => out.push({ key: getChatId(myEmail, c.email), type: 'dm', title: c.name, email: c.email, photo: safeUrl(c.photoURL) || AVATAR }));
+            Object.values(groupsMap).forEach((g) => out.push({ key: 'g:' + g.id, type: 'group', title: g.name, gid: g.id, members: g.members, photo: GROUP_AV }));
+            return out;
+        }
+        const msgsRef = (it) => it.type === 'group'
+            ? db.collection('groups').doc(it.gid).collection('messages')
+            : db.collection('private_chats').doc(it.key).collection('messages');
+
+        // Har chat ka aakhri message (preview, time, unread, sound)
+        function syncLastListeners() {
+            const list = entries(), keys = new Set(list.map((e) => e.key));
+            Object.keys(lastSubs).forEach((k) => { if (!keys.has(k)) { lastSubs[k](); delete lastSubs[k]; delete lastMap[k]; } });
+            list.forEach((it) => {
+                if (lastSubs[it.key]) return;
+                let first = true;
+                lastSubs[it.key] = msgsRef(it).orderBy('timestamp', 'desc').limit(1).onSnapshot((snap) => {
+                    const d = snap.docs[0];
+                    if (!d) { delete lastMap[it.key]; renderChats(); return; }
+                    const m = d.data({ serverTimestamps: 'estimate' });
+                    lastMap[it.key] = { text: m.text || '', image: !!m.imageUrl, sender: m.sender, ts: m.timestamp ? m.timestamp.toMillis() : Date.now() };
+                    if (current && current.key === it.key) markRead(it.key);
+                    else if (!first && m.sender !== myEmail && prefs.sound) beep();
+                    first = false;
+                    renderChats();
+                }, (e) => console.warn(e.code));
+            });
+        }
+
+        // ================= READ / FAVORITES (is device par save) =================
+        const readKey = () => 'lastRead:' + myEmail, favKey = () => 'fav:' + myEmail;
+        function markRead(key) {
+            const r = store.get(readKey(), {});
+            r[key] = Math.max(Date.now(), (lastMap[key] || {}).ts || 0);
+            store.set(readKey(), r);
+        }
+        function isUnread(key) {
+            const l = lastMap[key];
+            return !!l && l.sender !== myEmail && l.ts > (store.get(readKey(), {})[key] || 0);
+        }
+        const isFav = (key) => store.get(favKey(), []).includes(key);
+        function toggleFav() {
+            if (!current) return;
+            const f = store.get(favKey(), []), i = f.indexOf(current.key);
+            i >= 0 ? f.splice(i, 1) : f.push(current.key);
+            store.set(favKey(), f); updateFavBtn(); renderChats();
+            toast(i >= 0 ? 'पसंदीदा से हटाया' : 'पसंदीदा में जोड़ा');
+        }
+        function updateFavBtn() { $('fav-btn').classList.toggle('on', !!current && isFav(current.key)); }
+
+        // ================= CHAT LIST =================
+        function fmtTime(ms) {
+            const d = new Date(ms);
+            return d.toDateString() === new Date().toDateString()
+                ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+        }
+        function renderChats() {
+            const list = $('contact-list');
+            list.innerHTML = '';
+            const all = entries();
+            let items = all;
+            if (filter === 'unread') items = items.filter((i) => isUnread(i.key));
+            else if (filter === 'fav') items = items.filter((i) => isFav(i.key));
+            else if (filter === 'groups') items = items.filter((i) => i.type === 'group');
+            if (searchTerm) items = items.filter((i) => (i.title + ' ' + (i.email || '')).toLowerCase().includes(searchTerm));
+
+            if (!items.length) {
+                const li = document.createElement('li');
+                li.className = 'no-contacts';
+                li.textContent = all.length === 0 ? 'Abhi koi chat nahi hai. Neeche + se dost jodein ya upar 👥 se group banayein.' : 'Is filter mein kuch nahi mila.';
+                list.appendChild(li);
+                return;
+            }
+            items.sort((a, b) => (((lastMap[b.key] || {}).ts || 0) - ((lastMap[a.key] || {}).ts || 0)) || a.title.localeCompare(b.title));
+
+            items.forEach((it) => {
+                const l = lastMap[it.key], unread = isUnread(it.key);
+                let prev = it.type === 'group' ? it.members.length + ' सदस्य' : it.email;
+                if (l) prev = (l.sender === myEmail ? 'आप: ' : (it.type === 'group' ? l.sender.split('@')[0] + ': ' : '')) + (l.image ? '📷 फोटो' : l.text);
+
+                const li = document.createElement('li');
+                li.className = 'contact-item' + (current && current.key === it.key ? ' active' : '') + (unread ? ' unread' : '');
+                const img = document.createElement('img'); img.src = it.photo; img.alt = '';
+                const details = document.createElement('div'); details.className = 'contact-details';
+                const r1 = document.createElement('div'); r1.className = 'contact-row-1';
+                const name = document.createElement('span'); name.className = 'contact-name'; name.textContent = it.title;
+                const time = document.createElement('span'); time.className = 'contact-time'; time.textContent = l ? fmtTime(l.ts) : '';
+                r1.append(name, time);
+                const r2 = document.createElement('div'); r2.className = 'contact-row-2';
+                const sub = document.createElement('span'); sub.className = 'contact-last-msg'; sub.textContent = prev;
+                r2.appendChild(sub);
+                if (unread) { const b = document.createElement('span'); b.className = 'badge'; b.textContent = '●'; r2.appendChild(b); }
+                details.append(r1, r2);
+                li.append(img, details);
+                li.addEventListener('click', () => openChat(it));
+                list.appendChild(li);
+            });
+        }
+
+        // ================= OPEN CHAT / MESSAGES =================
+        function resetChatView() {
+            if (unsubChat) { unsubChat(); unsubChat = null; }
+            current = null;
+            $('active-chat').style.display = 'none';
+            $('empty-chat').style.display = 'flex';
+            $('chat-area').innerHTML = '';
+            $('emoji-panel').classList.add('hidden');
+            appContainer.classList.remove('chat-open');
+        }
+        function showSidebar() { resetChatView(); renderChats(); }
+
+        function openChat(it) {
+            current = it;
+            $('empty-chat').style.display = 'none';
+            $('active-chat').style.display = 'flex';
+            $('chat-friend-name').textContent = it.title;
+            $('chat-friend-email').textContent = it.type === 'group' ? it.members.map((m) => m.split('@')[0]).join(', ') : it.email;
+            $('chat-friend-dp').src = it.photo;
+            $('del-btn').style.display = it.type === 'dm' ? '' : 'none';
+            $('emoji-panel').classList.add('hidden');
+            updateFavBtn();
+            appContainer.classList.add('chat-open');
+            markRead(it.key); renderChats();
+
+            if (unsubChat) unsubChat();
+            const area = $('chat-area');
+            area.innerHTML = '';
+            unsubChat = msgsRef(it).orderBy('timestamp').onSnapshot((snap) => {
+                if (!current || current.key !== it.key) return;
+                area.innerHTML = '';
+                snap.forEach((doc) => {
+                    const m = doc.data({ serverTimestamps: 'estimate' });
+                    const mine = m.sender === myEmail;
+                    const div = document.createElement('div');
+                    div.className = 'message ' + (mine ? 'sent' : 'received');
+                    if (it.type === 'group' && !mine) {
+                        const s = document.createElement('div'); s.className = 'msg-sender';
+                        s.textContent = (m.sender || '').split('@')[0]; div.appendChild(s);
+                    }
+                    const imgUrl = safeUrl(m.imageUrl);   // purani bheji hui photos
+                    if (imgUrl) {
+                        const img = document.createElement('img');
+                        img.src = imgUrl; img.loading = 'lazy'; img.style.cursor = 'pointer';
+                        img.onclick = () => window.open(imgUrl, '_blank', 'noopener');
+                        img.onload = () => { area.scrollTop = area.scrollHeight; };
+                        div.appendChild(img);
+                    }
+                    if (m.text) { const t = document.createElement('div'); t.textContent = m.text; div.appendChild(t); }
+                    const time = document.createElement('span');
+                    time.className = 'msg-time';
+                    time.textContent = m.timestamp ? m.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
+                    div.appendChild(time);
+                    area.appendChild(div);
+                });
+                area.scrollTop = area.scrollHeight;
+            }, (err) => { console.error(err); area.textContent = 'Messages load nahi hue (' + err.code + ').'; });
+            if (window.innerWidth > 768) $('msg-input').focus();
+        }
+
+        async function sendMessage() {
+            const input = $('msg-input'), text = input.value.trim();
+            if (!text || !current) return;
+            input.value = '';
+            $('emoji-panel').classList.add('hidden');
+            try { await msgsRef(current).add({ text: text, sender: myEmail, timestamp: ts() }); }
+            catch (err) { console.error(err); input.value = text; alert('Message nahi gaya (' + err.code + ').'); }
+        }
+
+        // ================= FRIENDS / GROUPS / PROFILE =================
+        function myProfile() {
+            const u = auth.currentUser;
+            return { email: myEmail, name: u.displayName || myEmail.split('@')[0], photoURL: safeUrl(u.photoURL) };
+        }
+        const pushProfile = (friend) => db.collection('users').doc(friend).collection('incoming').doc(myEmail).set(myProfile());
+        async function syncProfileToFriends() {
+            const emails = new Set([...Object.keys(contactsMap), ...Object.keys(incomingMap)]);
+            await Promise.all([...emails].map((e) => pushProfile(e).catch((err) => console.warn(err))));
+        }
+
         async function addFriend() {
             const friendEmail = normalizeEmail(prompt('Dost ki Email ID dalein:'));
             if (!friendEmail) return;
-            if (!/^[^\s@|]+@[^\s@|]+\.[^\s@|]+$/.test(friendEmail)) return alert('Email ID sahi nahi hai.');
+            if (!EMAIL_RE.test(friendEmail)) return alert('Email ID sahi nahi hai.');
             if (friendEmail === myEmail) return alert('Aap khud ko add nahi kar sakte.');
             const friendName = (prompt('Dost ka naam:') || '').trim();
             if (!friendName) return;
             try {
                 await db.collection('users').doc(myEmail).collection('contacts').doc(friendEmail).set({ email: friendEmail, name: friendName });
-                try {
-                    await db.collection('users').doc(friendEmail).collection('incoming').doc(myEmail).set({ email: myEmail, name: myEmail.split('@')[0] });
-                } catch (e) { console.warn('incoming write failed', e); }
+                try { await pushProfile(friendEmail); } catch (e) { console.warn(e); }
                 toast(friendName + ' add ho gaya!');
-            } catch (err) {
-                console.error(err);
-                alert('Dost add nahi ho paya (' + err.code + ').');
-            }
+            } catch (err) { console.error(err); alert('Dost add nahi ho paya (' + err.code + ').'); }
         }
 
-        function renderContacts() {
-            const list = $('contact-list');
-            list.innerHTML = '';
-            let contacts = Object.values(Object.assign({}, incomingMap, contactsMap));
-            const total = contacts.length;
-            if (searchTerm) {
-                contacts = contacts.filter((c) => (c.name + ' ' + c.email).toLowerCase().includes(searchTerm));
-            }
-            if (contacts.length === 0) {
-                const li = document.createElement('li');
-                li.className = 'no-contacts';
-                li.textContent = total === 0 ? 'Abhi koi dost nahi hai. Neeche + dabakar dost jodein.' : 'Koi nahi mila.';
-                list.appendChild(li);
-                return;
-            }
-            contacts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-            contacts.forEach((contact) => {
-                const li = document.createElement('li');
-                li.className = 'contact-item' + (contact.email === currentFriendEmail ? ' active' : '');
-
-                const img = document.createElement('img');
-                img.src = AVATAR; img.alt = '';
-                const details = document.createElement('div');
-                details.className = 'contact-details';
-                const name = document.createElement('span');
-                name.className = 'contact-name';
-                name.textContent = contact.name;
-                const sub = document.createElement('span');
-                sub.className = 'contact-sub';
-                sub.textContent = contact.email;
-
-                details.append(name, sub);
-                li.append(img, details);
-                li.addEventListener('click', () => openChat(contact.email, contact.name));
-                list.appendChild(li);
-            });
-        }
-
-        function loadContacts() {
-            if (unsubscribeContacts) unsubscribeContacts();
-            if (unsubscribeIncoming) unsubscribeIncoming();
-            const userDoc = db.collection('users').doc(myEmail);
-            const onErr = (err) => { console.error(err); toast('Contacts load nahi hue (' + err.code + ')'); };
-            unsubscribeContacts = userDoc.collection('contacts').onSnapshot((snap) => {
-                contactsMap = {}; snap.forEach((d) => { contactsMap[d.id] = d.data(); }); renderContacts();
-            }, onErr);
-            unsubscribeIncoming = userDoc.collection('incoming').onSnapshot((snap) => {
-                incomingMap = {}; snap.forEach((d) => { incomingMap[d.id] = d.data(); }); renderContacts();
-            }, onErr);
-        }
-
-        function resetChatView() {
-            if (unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
-            currentChatId = null;
-            currentFriendEmail = null;
-            $('active-chat').style.display = 'none';
-            $('empty-chat').style.display = 'flex';
-            $('chat-area').innerHTML = '';
-            appContainer.classList.remove('chat-open');
-        }
-
-        function openChat(friendEmail, friendName) {
-            currentFriendEmail = friendEmail;
-            currentChatId = getChatId(myEmail, friendEmail);
-            $('empty-chat').style.display = 'none';
-            $('active-chat').style.display = 'flex';
-            $('chat-friend-name').textContent = friendName;
-            $('chat-friend-email').textContent = friendEmail;
-            appContainer.classList.add('chat-open');
-            renderContacts();
-
-            if (unsubscribeChat) unsubscribeChat();
-            const chatArea = $('chat-area');
-            chatArea.innerHTML = '';
-
-            unsubscribeChat = db.collection('private_chats').doc(currentChatId).collection('messages').orderBy('timestamp')
-                .onSnapshot((snapshot) => {
-                    chatArea.innerHTML = '';
-                    snapshot.forEach((doc) => {
-                        const data = doc.data({ serverTimestamps: 'estimate' });
-                        const div = document.createElement('div');
-                        div.className = 'message ' + (data.sender === myEmail ? 'sent' : 'received');
-                        div.appendChild(document.createTextNode(data.text));
-                        const time = document.createElement('span');
-                        time.className = 'msg-time';
-                        time.textContent = data.timestamp ? data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
-                        div.appendChild(time);
-                        chatArea.appendChild(div);
-                    });
-                    chatArea.scrollTop = chatArea.scrollHeight;
-                }, (err) => {
-                    console.error(err);
-                    chatArea.textContent = 'Messages load nahi hue (' + err.code + ').';
-                });
-
-            if (window.innerWidth > 768) $('msg-input').focus();
-        }
-
-        function showSidebar() {
-            resetChatView();
-            renderContacts();
-        }
-
-        async function sendMessage() {
-            const input = $('msg-input');
-            const text = input.value.trim();
-            if (!text || !currentChatId) return;
-            input.value = '';
+        async function createGroup() {
+            const name = (prompt('ग्रुप का नाम:') || '').trim().slice(0, 40);
+            if (!name) return;
+            const raw = prompt('सदस्यों की Email ID लिखें (कॉमा , से अलग करें):') || '';
+            const members = [...new Set([myEmail, ...raw.split(',').map(normalizeEmail).filter(Boolean)])];
+            if (members.some((m) => !EMAIL_RE.test(m))) return alert('कोई Email ID सही नहीं है।');
+            if (members.length < 2) return alert('कम से कम एक और सदस्य जोड़ें।');
             try {
-                await db.collection('private_chats').doc(currentChatId).collection('messages').add({
-                    text: text,
-                    sender: myEmail,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-            } catch (err) {
-                console.error(err);
-                input.value = text;
-                alert('Message nahi gaya (' + err.code + '). Internet ya Firestore Rules check karein.');
-            }
+                await db.collection('groups').add({ name: name, members: members, createdBy: myEmail, createdAt: ts() });
+                toast('ग्रुप बन गया!');
+            } catch (err) { console.error(err); alert('ग्रुप नहीं बना (' + err.code + '). Firestore Rules में groups जोड़ें।'); }
         }
 
-        // ===== Event listeners =====
+        async function deleteFriend() {
+            if (!current || current.type !== 'dm') return;
+            if (!confirm(current.title + ' को दोस्तों की सूची से हटाएँ?')) return;
+            const em = current.email, u = db.collection('users').doc(myEmail);
+            try {
+                await u.collection('contacts').doc(em).delete();
+                await u.collection('incoming').doc(em).delete();
+                resetChatView(); toast('दोस्त हटा दिया गया');
+            } catch (err) { alert('हटाने में दिक्कत आई (' + err.code + ').'); }
+        }
+
+        // ================= LISTENERS =================
         $('login-btn').addEventListener('click', loginUser);
         $('signup-btn').addEventListener('click', signUpUser);
         $('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') loginUser(); });
         $('email').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('password').focus(); });
         $('logout-btn').addEventListener('click', () => auth.signOut());
         $('add-friend-btn').addEventListener('click', addFriend);
+        $('new-group-btn').addEventListener('click', createGroup);
         $('back-btn').addEventListener('click', showSidebar);
         $('send-btn').addEventListener('click', sendMessage);
         $('msg-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
-        $('search-input').addEventListener('input', (e) => { searchTerm = e.target.value.trim().toLowerCase(); renderContacts(); });
-        document.querySelectorAll('[data-soon]').forEach((el) => el.addEventListener('click', () => toast('यह फीचर जल्द आएगा')));
+        $('fav-btn').addEventListener('click', toggleFav);
+        $('del-btn').addEventListener('click', deleteFriend);
+        $('search-input').addEventListener('input', (e) => { searchTerm = e.target.value.trim().toLowerCase(); renderChats(); });
+        document.querySelectorAll('.wa-chip').forEach((chip) => chip.addEventListener('click', () => {
+            filter = chip.dataset.filter;
+            document.querySelectorAll('.wa-chip').forEach((c) => c.classList.toggle('active', c === chip));
+            renderChats();
+        }));
+        document.querySelectorAll('.nav-item:not(.active)').forEach((el) => el.addEventListener('click', () => toast('यह फीचर जल्द आएगा')));
+
+        // Emoji
+        const panel = $('emoji-panel');
+        [...'😀😂🤣😊😍🥰😘😎🤔😅😭😢😡😴🙄😇👍👎👏🙏🙌💪🤝👋🔥✨⭐💯🎉🎮🏆💖💔🌹🍕☕🎵📞✅❌'].forEach((e) => {
+            const s = document.createElement('span'); s.textContent = e;
+            s.addEventListener('click', () => { const i = $('msg-input'); i.value += e; i.focus(); });
+            panel.appendChild(s);
+        });
+        $('emoji-btn').addEventListener('click', () => panel.classList.toggle('hidden'));
+
+        // Settings
+        $('settings-btn').addEventListener('click', () => $('settings-modal').classList.remove('hidden'));
+        $('close-settings').addEventListener('click', () => $('settings-modal').classList.add('hidden'));
+        $('dark-mode-btn').addEventListener('click', () => setPref('dark', !prefs.dark));
+        $('sound-btn').addEventListener('click', () => setPref('sound', !prefs.sound));
+        $('font-btn').addEventListener('click', () => setPref('fs', { m: 'l', l: 's', s: 'm' }[prefs.fs]));
+        $('wallpaper-btn').addEventListener('click', () => setPref('wp', prefs.wp === 'plain' ? 'pattern' : 'plain'));
+        $('reset-pw-btn').addEventListener('click', async () => {
+            try { await auth.sendPasswordResetEmail(myEmail); toast('Password reset ka link ' + myEmail + ' par bhej diya'); }
+            catch (e) { alert('Link nahi bhej paya (' + e.code + ').'); }
+        });
+        $('update-name-btn').addEventListener('click', async () => {
+            const n = (prompt('अपना नया नाम लिखें:', auth.currentUser.displayName || '') || '').trim().slice(0, 40);
+            if (!n) return;
+            try { await auth.currentUser.updateProfile({ displayName: n }); $('my-name').textContent = n; syncProfileToFriends(); toast('आपका नाम बदल गया है!'); }
+            catch (e) { alert('नाम बदलने में कोई दिक्कत आई।'); }
+        });
+        $('update-dp-btn').addEventListener('click', async () => {
+            const u = (prompt('अपनी नई फोटो का लिंक (https://...) यहाँ डालें:', auth.currentUser.photoURL || '') || '').trim();
+            if (!u) return;
+            if (!safeUrl(u)) return alert('लिंक https:// से शुरू होना चाहिए।');
+            try { await auth.currentUser.updateProfile({ photoURL: u }); $('my-dp').src = u; $('settings-dp-preview').src = u; syncProfileToFriends(); toast('आपकी प्रोफाइल फोटो बदल गई है!'); }
+            catch (e) { alert('फोटो बदलने में कोई दिक्कत आई।'); }
+        });
+
+        applyPrefs();
+        // Splash screen
+        setTimeout(() => { const s = $('splash'); s.classList.add('out'); setTimeout(() => s.remove(), 600); }, 2200);
     </script>
 </body>
 </html>
