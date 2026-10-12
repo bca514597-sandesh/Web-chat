@@ -164,6 +164,23 @@
         body.fs-small .message { font-size: .85rem; }
         body.wp-plain #chat-window { background-image: none; }
 
+        /* ===== Calls ===== */
+        #call-screen { position: fixed; inset: 0; background: #0b141a; z-index: 900; display: flex; flex-direction: column; align-items: center; justify-content: space-between; color: #fff; padding: 50px 20px calc(30px + env(safe-area-inset-bottom, 0px)); }
+        #remote-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #0b141a; z-index: 0; }
+        #local-video { position: absolute; top: 20px; right: 20px; width: 110px; height: 150px; object-fit: cover; border-radius: 12px; border: 2px solid #fff; z-index: 2; background: #222; transform: scaleX(-1); }
+        .call-info { position: relative; z-index: 1; text-align: center; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+        .call-info h2 { font-weight: 500; font-size: 1.6rem; }
+        #call-avatar { width: 130px; height: 130px; border-radius: 50%; object-fit: cover; position: relative; z-index: 1; }
+        .call-controls { position: relative; z-index: 1; display: flex; gap: 22px; }
+        .call-btn { width: 62px; height: 62px; border-radius: 50%; border: none; font-size: 1.4rem; color: #fff; background: rgba(255,255,255,.2); cursor: pointer; }
+        .call-btn.off { background: #fff; color: #111; }
+        .call-btn.end { background: #e53935; }
+        .call-btn.accept { background: #25d366; }
+        #incoming-call { position: fixed; inset: 0; background: rgba(11,20,26,.96); z-index: 950; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #fff; text-align: center; }
+        #incoming-call img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; }
+        .inc-actions { display: flex; gap: 50px; margin-top: 40px; }
+        #toast { z-index: 1200; }
+
         @media screen and (max-width: 768px) {
             #app-container { height: 100vh; height: 100dvh; max-width: none; box-shadow: none; border-radius: 0; }
             #sidebar { width: 100%; min-width: 0; border: none; }
@@ -247,6 +264,8 @@
                         <p id="chat-friend-email"></p>
                     </div>
                     <i class="fas fa-star hd-btn" id="fav-btn" title="पसंदीदा"></i>
+                    <i class="fas fa-video hd-btn" id="video-call-btn" title="वीडियो कॉल"></i>
+                    <i class="fas fa-phone hd-btn" id="audio-call-btn" title="वॉइस कॉल"></i>
                     <i class="fas fa-trash hd-btn" id="del-btn" title="दोस्त हटाएँ"></i>
                 </div>
                 <div class="chat-area" id="chat-area"></div>
@@ -283,6 +302,28 @@
         </div>
     </div>
 
+    <div id="incoming-call" class="hidden">
+        <img id="inc-avatar" src="" alt="">
+        <h2 id="inc-name"></h2>
+        <p id="inc-type"></p>
+        <div class="inc-actions">
+            <button class="call-btn end" id="reject-btn" title="काटें"><i class="fas fa-phone-slash"></i></button>
+            <button class="call-btn accept" id="accept-btn" title="उठाएँ"><i class="fas fa-phone"></i></button>
+        </div>
+    </div>
+
+    <div id="call-screen" class="hidden">
+        <video id="remote-video" autoplay playsinline></video>
+        <video id="local-video" autoplay playsinline muted></video>
+        <div class="call-info"><h2 id="call-name"></h2><p id="call-status"></p></div>
+        <img id="call-avatar" src="" alt="">
+        <div class="call-controls">
+            <button class="call-btn" id="mute-btn" title="म्यूट"><i class="fas fa-microphone"></i></button>
+            <button class="call-btn" id="cam-btn" title="कैमरा"><i class="fas fa-video"></i></button>
+            <button class="call-btn end" id="end-call-btn" title="कॉल काटें"><i class="fas fa-phone-slash"></i></button>
+        </div>
+    </div>
+
     <div id="toast"></div>
 
     <script>
@@ -311,6 +352,7 @@
         let unsubChat = null, unsubContacts = null, unsubIncoming = null, unsubGroups = null;
         let contactsMap = {}, incomingMap = {}, groupsMap = {}, lastMap = {}, lastSubs = {};
         let filter = 'all', searchTerm = '', toastTimer;
+        let view = 'chats', unsubCallsIn = null, unsubCallsOut = null, callsInMap = {}, callsOutMap = {}, activeCall = null;
 
         const normalizeEmail = (e) => (e || '').trim().toLowerCase();
         const getChatId = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
@@ -376,6 +418,10 @@
             [unsubChat, unsubContacts, unsubIncoming, unsubGroups].forEach((u) => u && u());
             unsubChat = unsubContacts = unsubIncoming = unsubGroups = null;
             Object.values(lastSubs).forEach((u) => u()); lastSubs = {};
+            [unsubCallsIn, unsubCallsOut].forEach((u) => u && u()); unsubCallsIn = unsubCallsOut = null;
+            callsInMap = {}; callsOutMap = {}; view = 'chats';
+            if (activeCall) endCall(null);
+            if (incoming) hideIncoming();
         }
 
         auth.onAuthStateChanged((user) => {
@@ -409,6 +455,7 @@
             unsubGroups = db.collection('groups').where('members', 'array-contains', myEmail).onSnapshot((s) => {
                 groupsMap = {}; s.forEach((d) => { groupsMap[d.id] = Object.assign({ id: d.id }, d.data()); }); refresh();
             }, (e) => console.warn('groups', e.code));
+            loadCalls();
         }
         function refresh() { syncLastListeners(); renderChats(); }
 
@@ -473,6 +520,7 @@
                 : d.toLocaleDateString([], { day: '2-digit', month: 'short' });
         }
         function renderChats() {
+            if (view === 'calls') return renderCalls();
             const list = $('contact-list');
             list.innerHTML = '';
             const all = entries();
@@ -535,6 +583,7 @@
             $('chat-friend-email').textContent = it.type === 'group' ? it.members.map((m) => m.split('@')[0]).join(', ') : it.email;
             $('chat-friend-dp').src = it.photo;
             $('del-btn').style.display = it.type === 'dm' ? '' : 'none';
+            $('audio-call-btn').style.display = $('video-call-btn').style.display = it.type === 'dm' ? '' : 'none';
             $('emoji-panel').classList.add('hidden');
             updateFavBtn();
             appContainer.classList.add('chat-open');
@@ -652,7 +701,6 @@
             document.querySelectorAll('.wa-chip').forEach((c) => c.classList.toggle('active', c === chip));
             renderChats();
         }));
-        document.querySelectorAll('.nav-item:not(.active)').forEach((el) => el.addEventListener('click', () => toast('यह फीचर जल्द आएगा')));
 
         // Emoji
         const panel = $('emoji-panel');
@@ -687,6 +735,207 @@
             try { await auth.currentUser.updateProfile({ photoURL: u }); $('my-dp').src = u; $('settings-dp-preview').src = u; syncProfileToFriends(); toast('आपकी प्रोफाइल फोटो बदल गई है!'); }
             catch (e) { alert('फोटो बदलने में कोई दिक्कत आई।'); }
         });
+
+        // ================= CALLS (WebRTC: voice + video) =================
+        const ICE = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }] };
+        const nameFor = (e) => (contactsMap[e] && contactsMap[e].name) || (incomingMap[e] && incomingMap[e].name) || e.split('@')[0];
+        const photoFor = (e) => safeUrl((incomingMap[e] || {}).photoURL) || AVATAR;
+        let ringTimer;
+        const startRing = () => { clearInterval(ringTimer); beep(); ringTimer = setInterval(beep, 1500); };
+        const stopRing = () => clearInterval(ringTimer);
+        const fmtDur = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+        const callStatusText = { ringing: 'कॉल कर रहे हैं', accepted: 'चालू', rejected: 'अस्वीकृत', missed: 'मिस्ड', ended: 'समाप्त' };
+
+        function loadCalls() {
+            const col = db.collection('calls');
+            const pack = (s) => { const m = {}; s.forEach((d) => { m[d.id] = Object.assign({ id: d.id }, d.data()); }); return m; };
+            unsubCallsOut = col.where('caller', '==', myEmail).onSnapshot((s) => { callsOutMap = pack(s); if (view === 'calls') renderCalls(); }, (e) => console.warn('calls', e.code));
+            unsubCallsIn = col.where('callee', '==', myEmail).onSnapshot((s) => {
+                callsInMap = pack(s);
+                if (view === 'calls') renderCalls();
+                s.docChanges().forEach((ch) => {
+                    const c = ch.doc.data();
+                    if (ch.type === 'added' && c.status === 'ringing' && Date.now() - c.createdAt < 45000 && !activeCall && !incoming) showIncoming(ch.doc.id, c);
+                });
+                if (incoming && callsInMap[incoming.id] && callsInMap[incoming.id].status !== 'ringing') hideIncoming();
+            }, (e) => console.warn('calls', e.code));
+        }
+
+        function renderCalls() {
+            const list = $('contact-list');
+            list.innerHTML = '';
+            const logs = Object.values(Object.assign({}, callsInMap, callsOutMap)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 40);
+            if (!logs.length) {
+                const li = document.createElement('li'); li.className = 'no-contacts';
+                li.textContent = 'अभी कोई कॉल नहीं है। चैट खोलकर 📞 या 📹 दबाएँ।';
+                list.appendChild(li); return;
+            }
+            logs.forEach((c) => {
+                const out = c.caller === myEmail, other = out ? c.callee : c.caller;
+                let st = callStatusText[c.status] || '';
+                if (c.status === 'ringing' && Date.now() - c.createdAt > 60000) st = 'मिस्ड';
+                if (c.status === 'ended' && c.answeredAt && c.endedAt) st = fmtDur(Math.round((c.endedAt - c.answeredAt) / 1000));
+                else if (c.status === 'ended') st = 'समाप्त';
+                const li = document.createElement('li'); li.className = 'contact-item';
+                const img = document.createElement('img'); img.src = photoFor(other); img.alt = '';
+                const d = document.createElement('div'); d.className = 'contact-details';
+                const r1 = document.createElement('div'); r1.className = 'contact-row-1';
+                const n = document.createElement('span'); n.className = 'contact-name'; n.textContent = nameFor(other);
+                const t = document.createElement('span'); t.className = 'contact-time'; t.textContent = fmtTime(c.createdAt);
+                r1.append(n, t);
+                const r2 = document.createElement('div'); r2.className = 'contact-row-2';
+                const sub = document.createElement('span'); sub.className = 'contact-last-msg';
+                sub.textContent = (out ? '↗ ' : '↙ ') + (c.type === 'video' ? '📹 ' : '📞 ') + st;
+                if (!out && st === 'मिस्ड') sub.style.color = '#e53935';
+                r2.appendChild(sub);
+                d.append(r1, r2); li.append(img, d);
+                li.addEventListener('click', () => startCall(other, c.type));
+                list.appendChild(li);
+            });
+        }
+
+        // ---- call setup ----
+        function makeCall(stream, ref, role, type, other, candCol) {
+            const c = { ref, stream, role, type, other, unsubs: [], ready: role === 'callee', queue: [], answered: false, done: false };
+            c.pc = new RTCPeerConnection(ICE);
+            stream.getTracks().forEach((t) => c.pc.addTrack(t, stream));
+            c.pc.onicecandidate = (e) => {
+                if (!e.candidate) return;
+                const data = e.candidate.toJSON();
+                if (c.ready) ref.collection(candCol).add(data).catch(() => {}); else c.queue.push(data);
+            };
+            c.pc.ontrack = (e) => { $('remote-video').srcObject = e.streams[0]; };
+            c.pc.onconnectionstatechange = () => {
+                const st = c.pc.connectionState;
+                if (st === 'connected') onConnected(c);
+                else if (st === 'failed') endCall('ended');
+            };
+            activeCall = c;
+            return c;
+        }
+        function listenCandidates(c, col) {
+            c.unsubs.push(c.ref.collection(col).onSnapshot((s) => s.docChanges().forEach((ch) => {
+                if (ch.type === 'added') c.pc.addIceCandidate(ch.doc.data()).catch(() => {});
+            })));
+        }
+        function onConnected(c) {
+            if (c.tick) return;
+            stopRing(); clearTimeout(c.timeout);
+            const t0 = Date.now();
+            $('call-avatar').classList.toggle('hidden', c.type === 'video');
+            c.tick = setInterval(() => { $('call-status').textContent = fmtDur(Math.round((Date.now() - t0) / 1000)); }, 1000);
+            $('call-status').textContent = '00:00';
+        }
+        function openCallScreen(c, status) {
+            const v = c.type === 'video';
+            $('call-name').textContent = nameFor(c.other); $('call-status').textContent = status;
+            $('call-avatar').src = photoFor(c.other); $('call-avatar').classList.remove('hidden');
+            $('local-video').srcObject = c.stream; $('local-video').classList.toggle('hidden', !v);
+            $('remote-video').classList.toggle('hidden', !v);
+            $('cam-btn').classList.toggle('hidden', !v);
+            $('mute-btn').classList.remove('off'); $('cam-btn').classList.remove('off');
+            $('call-screen').classList.remove('hidden');
+        }
+        async function getMedia(type) {
+            if (!navigator.mediaDevices || !window.RTCPeerConnection) { alert('यह ब्राउज़र कॉल सपोर्ट नहीं करता, या पेज HTTPS पर नहीं है।'); return null; }
+            try { return await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' }); }
+            catch (e) { alert('माइक' + (type === 'video' ? '/कैमरा' : '') + ' की अनुमति नहीं मिली।'); return null; }
+        }
+
+        async function startCall(email, type) {
+            if (activeCall || incoming) return toast('पहले से कॉल चालू है');
+            const stream = await getMedia(type); if (!stream) return;
+            const ref = db.collection('calls').doc();
+            const c = makeCall(stream, ref, 'caller', type, email, 'callerCandidates');
+            openCallScreen(c, 'कॉल कर रहे हैं...'); startRing();
+            try {
+                const offer = await c.pc.createOffer(); await c.pc.setLocalDescription(offer);
+                await ref.set({ caller: myEmail, callee: email, type: type, status: 'ringing', offer: { type: offer.type, sdp: offer.sdp }, createdAt: Date.now() });
+                c.ready = true; c.queue.forEach((d) => ref.collection('callerCandidates').add(d).catch(() => {})); c.queue = [];
+            } catch (e) { console.error(e); alert('कॉल नहीं लग पाई (' + e.code + '). Firestore Rules में calls जोड़ें।'); return endCall(null); }
+            c.unsubs.push(ref.onSnapshot((snap) => {
+                const d = snap.data(); if (!d || activeCall !== c) return;
+                if (d.answer && !c.answered) {
+                    c.answered = true; stopRing(); clearTimeout(c.timeout);
+                    $('call-status').textContent = 'कनेक्ट हो रहा है...';
+                    c.pc.setRemoteDescription(d.answer).then(() => listenCandidates(c, 'calleeCandidates')).catch(console.error);
+                }
+                if (['rejected', 'ended', 'missed'].includes(d.status)) endCall(null);
+            }));
+            c.timeout = setTimeout(() => { if (activeCall === c && !c.answered) { toast('कोई जवाब नहीं मिला'); endCall('missed'); } }, 45000);
+        }
+
+        let incoming = null;
+        function showIncoming(id, c) {
+            incoming = Object.assign({ id }, c);
+            $('inc-avatar').src = photoFor(c.caller); $('inc-name').textContent = nameFor(c.caller);
+            $('inc-type').textContent = c.type === 'video' ? '📹 वीडियो कॉल आ रही है...' : '📞 वॉइस कॉल आ रही है...';
+            $('incoming-call').classList.remove('hidden'); startRing();
+        }
+        function hideIncoming() { stopRing(); incoming = null; $('incoming-call').classList.add('hidden'); }
+
+        async function rejectCall() {
+            const inc = incoming; hideIncoming();
+            if (inc) db.collection('calls').doc(inc.id).update({ status: 'rejected', endedAt: Date.now() }).catch(() => {});
+        }
+        async function acceptCall() {
+            const inc = incoming; if (!inc) return;
+            hideIncoming();
+            const ref = db.collection('calls').doc(inc.id);
+            const stream = await getMedia(inc.type);
+            if (!stream) { ref.update({ status: 'rejected', endedAt: Date.now() }).catch(() => {}); return; }
+            const c = makeCall(stream, ref, 'callee', inc.type, inc.caller, 'calleeCandidates');
+            c.answered = true;
+            openCallScreen(c, 'कनेक्ट हो रहा है...');
+            try {
+                await c.pc.setRemoteDescription(inc.offer);
+                const ans = await c.pc.createAnswer(); await c.pc.setLocalDescription(ans);
+                await ref.update({ answer: { type: ans.type, sdp: ans.sdp }, status: 'accepted', answeredAt: Date.now() });
+                listenCandidates(c, 'callerCandidates');
+                c.unsubs.push(ref.onSnapshot((snap) => {
+                    const d = snap.data();
+                    if (d && ['ended', 'missed', 'rejected'].includes(d.status)) endCall(null);
+                }));
+            } catch (e) { console.error(e); alert('कॉल जुड़ नहीं पाई।'); endCall('ended'); }
+        }
+
+        // status = Firestore mein likhna hai to; null = samne wale ne kaat diya
+        function endCall(status) {
+            const c = activeCall; if (!c || c.done) return;
+            c.done = true; activeCall = null;
+            clearTimeout(c.timeout); clearInterval(c.tick); stopRing();
+            c.unsubs.forEach((u) => u());
+            c.stream.getTracks().forEach((t) => t.stop());
+            try { c.pc.close(); } catch (e) {}
+            $('call-screen').classList.add('hidden');
+            $('remote-video').srcObject = null; $('local-video').srcObject = null;
+            if (status) c.ref.update({ status: status, endedAt: Date.now() }).catch(() => {});
+        }
+
+        $('audio-call-btn').addEventListener('click', () => { if (current && current.type === 'dm') startCall(current.email, 'audio'); });
+        $('video-call-btn').addEventListener('click', () => { if (current && current.type === 'dm') startCall(current.email, 'video'); });
+        $('accept-btn').addEventListener('click', acceptCall);
+        $('reject-btn').addEventListener('click', rejectCall);
+        $('end-call-btn').addEventListener('click', () => {
+            const c = activeCall; if (!c) return;
+            endCall(c.answered ? 'ended' : (c.role === 'caller' ? 'missed' : 'rejected'));
+        });
+        const toggleTrack = (btn, kind) => $(btn).addEventListener('click', () => {
+            if (!activeCall) return;
+            const t = (kind === 'audio' ? activeCall.stream.getAudioTracks() : activeCall.stream.getVideoTracks())[0];
+            if (t) { t.enabled = !t.enabled; $(btn).classList.toggle('off', !t.enabled); }
+        });
+        toggleTrack('mute-btn', 'audio'); toggleTrack('cam-btn', 'video');
+
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach((el, i) => el.addEventListener('click', () => {
+            if (i === 0 || i === 3) {
+                view = i === 3 ? 'calls' : 'chats';
+                navItems.forEach((n, j) => n.classList.toggle('active', j === i));
+                document.querySelector('.wa-filters').style.display = view === 'calls' ? 'none' : '';
+                renderChats();
+            } else toast('यह फीचर जल्द आएगा');
+        }));
 
         applyPrefs();
         // Splash screen
