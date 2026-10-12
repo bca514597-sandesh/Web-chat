@@ -168,6 +168,7 @@
         #call-screen { position: fixed; inset: 0; background: #0b141a; z-index: 900; display: flex; flex-direction: column; align-items: center; justify-content: space-between; color: #fff; padding: 50px 20px calc(30px + env(safe-area-inset-bottom, 0px)); }
         #remote-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #0b141a; z-index: 0; }
         #local-video { position: absolute; top: 20px; right: 20px; width: 110px; height: 150px; object-fit: cover; border-radius: 12px; border: 2px solid #fff; z-index: 2; background: #222; transform: scaleX(-1); }
+        #remote-video.audio-only { inset: auto; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
         .call-info { position: relative; z-index: 1; text-align: center; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
         .call-info h2 { font-weight: 500; font-size: 1.6rem; }
         #call-avatar { width: 130px; height: 130px; border-radius: 50%; object-fit: cover; position: relative; z-index: 1; }
@@ -181,6 +182,36 @@
         .inc-actions { display: flex; gap: 50px; margin-top: 40px; }
         #toast { z-index: 1200; }
 
+        /* ===== Status ===== */
+        #status-compose, #status-viewer { position: fixed; inset: 0; z-index: 920; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #status-compose { gap: 18px; padding: 20px; background: #e91e63; }
+        #status-text { width: 100%; max-width: 520px; height: 220px; background: transparent; border: none; outline: none; color: #fff; font-size: 1.8rem; text-align: center; resize: none; }
+        #status-text::placeholder { color: rgba(255,255,255,.7); }
+        .sc-close { position: absolute; top: 20px; left: 20px; background: none; border: none; color: #fff; font-size: 1.6rem; cursor: pointer; }
+        #sc-colors { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        #sc-colors span { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(255,255,255,.5); cursor: pointer; }
+        #sc-colors span.on { border-color: #fff; transform: scale(1.15); }
+        #sv-bars { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 4px; z-index: 3; }
+        #sv-bars div { flex: 1; height: 3px; background: rgba(255,255,255,.35); border-radius: 2px; overflow: hidden; }
+        #sv-bars div i { display: block; height: 100%; width: 0; background: #fff; }
+        #sv-bars div.done i { width: 100%; }
+        #sv-bars div.active i { animation: svfill 5s linear forwards; }
+        @keyframes svfill { to { width: 100%; } }
+        .sv-head { position: absolute; top: 24px; left: 12px; right: 12px; display: flex; align-items: center; gap: 10px; z-index: 4; }
+        .sv-head img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        .sv-head div { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+        .sv-head small { opacity: .85; }
+        .sv-head i { font-size: 1.3rem; cursor: pointer; padding: 6px; }
+        #sv-views { font-size: .85rem; }
+        #sv-text { font-size: 1.9rem; text-align: center; padding: 90px 30px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 100%; overflow: auto; z-index: 1; }
+        .sv-tap { position: absolute; top: 90px; bottom: 0; width: 40%; z-index: 2; }
+        .sv-tap.prev { left: 0; } .sv-tap.next { right: 0; }
+        .sec-title { padding: 10px 15px; font-size: .85rem; color: #667781; font-weight: 500; }
+        .contact-item img.ring { border: 3px solid #e91e63; padding: 2px; }
+        .contact-item img.ring.seen { border-color: #c4c9cc; }
+        .add-st { color: #e91e63; font-size: 1.5rem; padding: 6px; }
+        body.dark-theme .sec-title { color: #8696a0; }
+
         @media screen and (max-width: 768px) {
             #app-container { height: 100vh; height: 100dvh; max-width: none; box-shadow: none; border-radius: 0; }
             #sidebar { width: 100%; min-width: 0; border: none; }
@@ -190,6 +221,13 @@
             #app-container.chat-open #chat-window { display: flex; }
         }
     </style>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#e91e63">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Web Chat">
 </head>
 <body>
 
@@ -293,6 +331,7 @@
                 <button id="update-dp-btn" class="btn secondary" style="margin-bottom: 15px;"><i class="fas fa-camera"></i> प्रोफाइल फोटो (DP) बदलें</button>
                 
                 <button id="dark-mode-btn" class="btn secondary" style="margin-bottom: 15px;"><i class="fas fa-moon"></i> डार्क मोड चालू करें</button>
+                <button id="install-btn" class="btn hidden" style="background:#e91e63; margin-bottom: 10px;"><i class="fas fa-download"></i> ऐप इंस्टॉल करें</button>
                 <button id="sound-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
                 <button id="font-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
                 <button id="wallpaper-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
@@ -324,6 +363,27 @@
         </div>
     </div>
 
+    <div id="status-compose" class="hidden">
+        <button class="sc-close" id="sc-cancel" title="बंद करें"><i class="fas fa-times"></i></button>
+        <textarea id="status-text" maxlength="300" placeholder="अपना स्टेटस लिखें..."></textarea>
+        <div id="sc-colors"></div>
+        <button class="call-btn accept" id="sc-post" title="स्टेटस लगाएँ"><i class="fas fa-paper-plane"></i></button>
+    </div>
+
+    <div id="status-viewer" class="hidden">
+        <div id="sv-bars"></div>
+        <div class="sv-head">
+            <img id="sv-avatar" src="" alt="">
+            <div><b id="sv-name"></b><small id="sv-time"></small></div>
+            <span id="sv-views"></span>
+            <i class="fas fa-trash" id="sv-del" title="हटाएँ"></i>
+            <i class="fas fa-times" id="sv-close" title="बंद करें"></i>
+        </div>
+        <div id="sv-text"></div>
+        <div class="sv-tap prev" id="sv-prev"></div>
+        <div class="sv-tap next" id="sv-next"></div>
+    </div>
+
     <div id="toast"></div>
 
     <script>
@@ -353,6 +413,7 @@
         let contactsMap = {}, incomingMap = {}, groupsMap = {}, lastMap = {}, lastSubs = {};
         let filter = 'all', searchTerm = '', toastTimer;
         let view = 'chats', unsubCallsIn = null, unsubCallsOut = null, callsInMap = {}, callsOutMap = {}, activeCall = null;
+        let unsubStatusIn = null, unsubStatusOut = null, statusInMap = {}, statusOutMap = {};
 
         const normalizeEmail = (e) => (e || '').trim().toLowerCase();
         const getChatId = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
@@ -379,9 +440,12 @@
             $('wallpaper-btn').innerHTML = '<i class="fas fa-image"></i> चैट बैकग्राउंड: ' + (prefs.wp === 'plain' ? 'सादा' : 'पैटर्न');
         }
         function setPref(k, v) { prefs[k] = v; store.set('prefs', prefs); applyPrefs(); }
+        let audioCtx;
         function beep() {
             try {
-                const c = new (window.AudioContext || window.webkitAudioContext)();
+                audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const c = audioCtx;
                 const o = c.createOscillator(), g = c.createGain();
                 o.connect(g); g.connect(c.destination); o.frequency.value = 880;
                 g.gain.setValueAtTime(.15, c.currentTime); g.gain.exponentialRampToValueAtTime(.001, c.currentTime + .25);
@@ -420,6 +484,11 @@
             Object.values(lastSubs).forEach((u) => u()); lastSubs = {};
             [unsubCallsIn, unsubCallsOut].forEach((u) => u && u()); unsubCallsIn = unsubCallsOut = null;
             callsInMap = {}; callsOutMap = {}; view = 'chats';
+            [unsubStatusIn, unsubStatusOut].forEach((u) => u && u()); unsubStatusIn = unsubStatusOut = null;
+            statusInMap = {}; statusOutMap = {}; sv = null;
+            $('status-viewer').classList.add('hidden'); $('status-compose').classList.add('hidden');
+            document.querySelectorAll('.nav-item').forEach((n, j) => n.classList.toggle('active', j === 0));
+            document.querySelector('.wa-filters').style.display = '';
             if (activeCall) endCall(null);
             if (incoming) hideIncoming();
         }
@@ -456,6 +525,7 @@
                 groupsMap = {}; s.forEach((d) => { groupsMap[d.id] = Object.assign({ id: d.id }, d.data()); }); refresh();
             }, (e) => console.warn('groups', e.code));
             loadCalls();
+            loadStatus();
         }
         function refresh() { syncLastListeners(); renderChats(); }
 
@@ -521,6 +591,7 @@
         }
         function renderChats() {
             if (view === 'calls') return renderCalls();
+            if (view === 'updates') return renderUpdates();
             const list = $('contact-list');
             list.innerHTML = '';
             const all = entries();
@@ -737,7 +808,15 @@
         });
 
         // ================= CALLS (WebRTC: voice + video) =================
-        const ICE = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }] };
+        // TURN relay: kuch mobile/office networks par seedha connection nahi banta.
+        // Zyada bharosemand ke liye https://www.metered.ca se apni free credentials lekar neeche badal dein.
+        const ICE = {
+            iceServers: [
+                { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+                { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:80?transport=tcp', 'turn:openrelay.metered.ca:443', 'turns:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' }
+            ],
+            iceCandidatePoolSize: 2
+        };
         const nameFor = (e) => (contactsMap[e] && contactsMap[e].name) || (incomingMap[e] && incomingMap[e].name) || e.split('@')[0];
         const photoFor = (e) => safeUrl((incomingMap[e] || {}).photoURL) || AVATAR;
         let ringTimer;
@@ -755,7 +834,7 @@
                 if (view === 'calls') renderCalls();
                 s.docChanges().forEach((ch) => {
                     const c = ch.doc.data();
-                    if (ch.type === 'added' && c.status === 'ringing' && Date.now() - c.createdAt < 45000 && !activeCall && !incoming) showIncoming(ch.doc.id, c);
+                    if (ch.type === 'added' && c.status === 'ringing' && Math.abs(Date.now() - c.createdAt) < 90000 && !activeCall && !incoming) showIncoming(ch.doc.id, c);
                 });
                 if (incoming && callsInMap[incoming.id] && callsInMap[incoming.id].status !== 'ringing') hideIncoming();
             }, (e) => console.warn('calls', e.code));
@@ -804,11 +883,16 @@
                 const data = e.candidate.toJSON();
                 if (c.ready) ref.collection(candCol).add(data).catch(() => {}); else c.queue.push(data);
             };
-            c.pc.ontrack = (e) => { $('remote-video').srcObject = e.streams[0]; };
+            c.pc.ontrack = (e) => { const rv = $('remote-video'); rv.srcObject = e.streams[0]; rv.play().catch(() => {}); };
             c.pc.onconnectionstatechange = () => {
                 const st = c.pc.connectionState;
                 if (st === 'connected') onConnected(c);
-                else if (st === 'failed') endCall('ended');
+                else if (st === 'failed') { toast('कॉल कनेक्ट नहीं हो पाई — नेटवर्क की समस्या'); endCall('ended'); }
+            };
+            c.pc.oniceconnectionstatechange = () => {
+                const st = c.pc.iceConnectionState;
+                if (st === 'connected' || st === 'completed') onConnected(c);
+                else if (!c.tick && c.answered) $('call-status').textContent = 'कनेक्ट हो रहा है... (' + st + ')';
             };
             activeCall = c;
             return c;
@@ -820,7 +904,7 @@
         }
         function onConnected(c) {
             if (c.tick) return;
-            stopRing(); clearTimeout(c.timeout);
+            stopRing(); clearTimeout(c.timeout); clearTimeout(c.connTimer);
             const t0 = Date.now();
             $('call-avatar').classList.toggle('hidden', c.type === 'video');
             c.tick = setInterval(() => { $('call-status').textContent = fmtDur(Math.round((Date.now() - t0) / 1000)); }, 1000);
@@ -831,20 +915,32 @@
             $('call-name').textContent = nameFor(c.other); $('call-status').textContent = status;
             $('call-avatar').src = photoFor(c.other); $('call-avatar').classList.remove('hidden');
             $('local-video').srcObject = c.stream; $('local-video').classList.toggle('hidden', !v);
-            $('remote-video').classList.toggle('hidden', !v);
+            $('remote-video').classList.toggle('audio-only', !v);
             $('cam-btn').classList.toggle('hidden', !v);
             $('mute-btn').classList.remove('off'); $('cam-btn').classList.remove('off');
             $('call-screen').classList.remove('hidden');
         }
+        function armConnTimer(c) {
+            c.connTimer = setTimeout(() => {
+                if (activeCall === c && !c.tick) { toast('कॉल कनेक्ट नहीं हो पाई — नेटवर्क की समस्या'); endCall('ended'); }
+            }, 25000);
+        }
         async function getMedia(type) {
             if (!navigator.mediaDevices || !window.RTCPeerConnection) { alert('यह ब्राउज़र कॉल सपोर्ट नहीं करता, या पेज HTTPS पर नहीं है।'); return null; }
             try { return await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' }); }
-            catch (e) { alert('माइक' + (type === 'video' ? '/कैमरा' : '') + ' की अनुमति नहीं मिली।'); return null; }
+            catch (e) {
+                if (type === 'video') {
+                    try { const a = await navigator.mediaDevices.getUserMedia({ audio: true }); toast('कैमरा नहीं मिला — सिर्फ़ आवाज़ से कॉल'); return a; } catch (e2) {}
+                }
+                alert('माइक की अनुमति नहीं मिली। ब्राउज़र की सेटिंग में माइक/कैमरा "Allow" करें।');
+                return null;
+            }
         }
 
         async function startCall(email, type) {
             if (activeCall || incoming) return toast('पहले से कॉल चालू है');
             const stream = await getMedia(type); if (!stream) return;
+            if (!stream.getVideoTracks().length) type = 'audio';
             const ref = db.collection('calls').doc();
             const c = makeCall(stream, ref, 'caller', type, email, 'callerCandidates');
             openCallScreen(c, 'कॉल कर रहे हैं...'); startRing();
@@ -856,7 +952,7 @@
             c.unsubs.push(ref.onSnapshot((snap) => {
                 const d = snap.data(); if (!d || activeCall !== c) return;
                 if (d.answer && !c.answered) {
-                    c.answered = true; stopRing(); clearTimeout(c.timeout);
+                    c.answered = true; stopRing(); clearTimeout(c.timeout); armConnTimer(c);
                     $('call-status').textContent = 'कनेक्ट हो रहा है...';
                     c.pc.setRemoteDescription(d.answer).then(() => listenCandidates(c, 'calleeCandidates')).catch(console.error);
                 }
@@ -884,8 +980,8 @@
             const ref = db.collection('calls').doc(inc.id);
             const stream = await getMedia(inc.type);
             if (!stream) { ref.update({ status: 'rejected', endedAt: Date.now() }).catch(() => {}); return; }
-            const c = makeCall(stream, ref, 'callee', inc.type, inc.caller, 'calleeCandidates');
-            c.answered = true;
+            const c = makeCall(stream, ref, 'callee', (inc.type === 'video' && stream.getVideoTracks().length) ? 'video' : 'audio', inc.caller, 'calleeCandidates');
+            c.answered = true; armConnTimer(c);
             openCallScreen(c, 'कनेक्ट हो रहा है...');
             try {
                 await c.pc.setRemoteDescription(inc.offer);
@@ -903,7 +999,7 @@
         function endCall(status) {
             const c = activeCall; if (!c || c.done) return;
             c.done = true; activeCall = null;
-            clearTimeout(c.timeout); clearInterval(c.tick); stopRing();
+            clearTimeout(c.timeout); clearTimeout(c.connTimer); clearInterval(c.tick); stopRing();
             c.unsubs.forEach((u) => u());
             c.stream.getTracks().forEach((t) => t.stop());
             try { c.pc.close(); } catch (e) {}
@@ -929,13 +1025,171 @@
 
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach((el, i) => el.addEventListener('click', () => {
-            if (i === 0 || i === 3) {
-                view = i === 3 ? 'calls' : 'chats';
+            if (i !== 2) {
+                view = ['chats', 'updates', 'chats', 'calls'][i];
                 navItems.forEach((n, j) => n.classList.toggle('active', j === i));
-                document.querySelector('.wa-filters').style.display = view === 'calls' ? 'none' : '';
+                document.querySelector('.wa-filters').style.display = view !== 'chats' ? 'none' : '';
                 renderChats();
             } else toast('यह फीचर जल्द आएगा');
         }));
+
+        // ================= STATUS / अपडेट्स (24 घंटे) =================
+        const STATUS_COLORS = ['#e91e63', '#128c7e', '#6a1b9a', '#1565c0', '#ef6c00', '#37474f', '#2e7d32', '#c62828'];
+        let composeBg = STATUS_COLORS[0], sv = null;
+
+        function loadStatus() {
+            const col = db.collection('statuses');
+            const pack = (s, mine) => {
+                const m = {}, now = Date.now();
+                s.forEach((d) => {
+                    const v = d.data();
+                    if (v.expiresAt <= now) { if (mine) d.ref.delete().catch(() => {}); return; }   // purane apne status saaf
+                    m[d.id] = Object.assign({ id: d.id }, v);
+                });
+                return m;
+            };
+            unsubStatusIn = col.where('audience', 'array-contains', myEmail).onSnapshot((s) => { statusInMap = pack(s, false); if (view === 'updates') renderUpdates(); }, (e) => console.warn('status', e.code));
+            unsubStatusOut = col.where('owner', '==', myEmail).onSnapshot((s) => { statusOutMap = pack(s, true); if (view === 'updates') renderUpdates(); }, (e) => console.warn('status', e.code));
+        }
+
+        function statusGroups() {
+            const g = {}, now = Date.now();
+            Object.values(statusInMap).filter((x) => x.expiresAt > now).forEach((x) => { (g[x.owner] = g[x.owner] || []).push(x); });
+            Object.values(g).forEach((a) => a.sort((p, q) => p.createdAt - q.createdAt));
+            return g;
+        }
+
+        function renderUpdates() {
+            const list = $('contact-list');
+            list.innerHTML = '';
+            const now = Date.now();
+            const mine = Object.values(statusOutMap).filter((x) => x.expiresAt > now).sort((a, b) => a.createdAt - b.createdAt);
+
+            const row = (photo, title, subText, ring, onClick, extra) => {
+                const li = document.createElement('li'); li.className = 'contact-item';
+                const img = document.createElement('img'); img.src = photo; img.alt = ''; if (ring) img.className = ring;
+                const d = document.createElement('div'); d.className = 'contact-details';
+                const n = document.createElement('span'); n.className = 'contact-name'; n.textContent = title;
+                const sb = document.createElement('span'); sb.className = 'contact-last-msg'; sb.textContent = subText;
+                d.append(n, sb); li.append(img, d);
+                if (extra) li.appendChild(extra);
+                li.addEventListener('click', onClick);
+                list.appendChild(li);
+            };
+            const title = (t) => { const li = document.createElement('li'); li.className = 'sec-title'; li.textContent = t; list.appendChild(li); };
+
+            const plus = document.createElement('i'); plus.className = 'fas fa-plus-circle add-st'; plus.title = 'नया स्टेटस';
+            plus.addEventListener('click', (e) => { e.stopPropagation(); openCompose(); });
+            row($('my-dp').src, 'मेरा स्टेटस',
+                mine.length ? mine.length + ' स्टेटस • ' + fmtTime(mine[mine.length - 1].createdAt) : 'स्टेटस जोड़ने के लिए दबाएँ',
+                mine.length ? 'ring seen' : '', () => (mine.length ? openStatusViewer(mine, true) : openCompose()), plus);
+
+            const g = statusGroups();
+            const owners = Object.keys(g).sort((a, b) => g[b][g[b].length - 1].createdAt - g[a][g[a].length - 1].createdAt);
+            title('हाल के अपडेट');
+            if (!owners.length) {
+                const li = document.createElement('li'); li.className = 'no-contacts';
+                li.textContent = 'अभी दोस्तों का कोई स्टेटस नहीं है।'; list.appendChild(li); return;
+            }
+            owners.forEach((o) => {
+                const a = g[o], unseen = a.some((x) => !(x.viewedBy || []).includes(myEmail));
+                row(photoFor(o), nameFor(o), fmtTime(a[a.length - 1].createdAt) + ' • ' + a.length + ' स्टेटस', unseen ? 'ring' : 'ring seen', () => openStatusViewer(a, false));
+            });
+        }
+
+        // ---- लिखना ----
+        function openCompose() {
+            const box = $('sc-colors');
+            if (!box.children.length) STATUS_COLORS.forEach((c) => {
+                const s = document.createElement('span'); s.style.background = c;
+                s.addEventListener('click', () => { composeBg = c; $('status-compose').style.background = c; [...box.children].forEach((x) => x.classList.toggle('on', x === s)); });
+                box.appendChild(s);
+            });
+            [...box.children].forEach((x, i) => x.classList.toggle('on', STATUS_COLORS[i] === composeBg));
+            $('status-text').value = '';
+            $('status-compose').style.background = composeBg;
+            $('status-compose').classList.remove('hidden');
+            $('status-text').focus();
+        }
+        async function postStatus() {
+            const text = $('status-text').value.trim();
+            if (!text) return toast('पहले कुछ लिखें');
+            const audience = [...new Set([...Object.keys(contactsMap), ...Object.keys(incomingMap)])];
+            if (!audience.length) return alert('पहले कम से कम एक दोस्त जोड़ें, तभी कोई आपका स्टेटस देख पाएगा।');
+            const now = Date.now();
+            try {
+                await db.collection('statuses').add({ owner: myEmail, text: text.slice(0, 300), bg: composeBg, createdAt: now, expiresAt: now + 24 * 3600 * 1000, audience: audience, viewedBy: [] });
+                $('status-compose').classList.add('hidden');
+                toast('स्टेटस लग गया (24 घंटे के लिए)');
+            } catch (e) { console.error(e); alert('स्टेटस नहीं लगा (' + e.code + '). Firestore Rules में statuses जोड़ें।'); }
+        }
+
+        // ---- देखना ----
+        function openStatusViewer(list, own) {
+            let i = own ? 0 : Math.max(0, list.findIndex((x) => !(x.viewedBy || []).includes(myEmail)));
+            sv = { list: list.slice(), i: i, own: own, timer: null };
+            $('status-viewer').classList.remove('hidden');
+            showStatus();
+        }
+        function showStatus() {
+            if (!sv) return;
+            clearTimeout(sv.timer);
+            const item = sv.list[sv.i];
+            const s = statusOutMap[item.id] || statusInMap[item.id] || item;
+            $('status-viewer').style.background = s.bg;
+            $('sv-text').textContent = s.text;
+            $('sv-name').textContent = sv.own ? 'मेरा स्टेटस' : nameFor(s.owner);
+            $('sv-time').textContent = fmtTime(s.createdAt);
+            $('sv-avatar').src = sv.own ? $('my-dp').src : photoFor(s.owner);
+            $('sv-del').style.display = sv.own ? '' : 'none';
+            $('sv-views').textContent = sv.own ? '👁 ' + (s.viewedBy || []).length : '';
+            const bars = $('sv-bars'); bars.innerHTML = '';
+            sv.list.forEach((_, k) => {
+                const b = document.createElement('div'); b.className = k < sv.i ? 'done' : (k === sv.i ? 'active' : '');
+                b.appendChild(document.createElement('i')); bars.appendChild(b);
+            });
+            if (!sv.own && !(s.viewedBy || []).includes(myEmail)) {
+                db.collection('statuses').doc(s.id).update({ viewedBy: firebase.firestore.FieldValue.arrayUnion(myEmail) }).catch(() => {});
+            }
+            sv.timer = setTimeout(nextStatus, 5000);
+        }
+        function nextStatus() { if (!sv) return; if (sv.i < sv.list.length - 1) { sv.i++; showStatus(); } else closeViewer(); }
+        function prevStatus() { if (sv && sv.i > 0) { sv.i--; showStatus(); } else showStatus(); }
+        function closeViewer() {
+            if (sv) { clearTimeout(sv.timer); sv = null; }
+            $('status-viewer').classList.add('hidden');
+            if (view === 'updates') renderUpdates();
+        }
+
+        $('sc-cancel').addEventListener('click', () => $('status-compose').classList.add('hidden'));
+        $('sc-post').addEventListener('click', postStatus);
+        $('sv-close').addEventListener('click', closeViewer);
+        $('sv-next').addEventListener('click', nextStatus);
+        $('sv-prev').addEventListener('click', prevStatus);
+        $('sv-del').addEventListener('click', async () => {
+            if (!sv || !sv.own) return;
+            clearTimeout(sv.timer);
+            const s = sv.list[sv.i];
+            if (!confirm('यह स्टेटस हटाएँ?')) return showStatus();
+            try {
+                await db.collection('statuses').doc(s.id).delete();
+                sv.list.splice(sv.i, 1);
+                if (!sv.list.length) return closeViewer();
+                if (sv.i >= sv.list.length) sv.i = sv.list.length - 1;
+                showStatus();
+            } catch (e) { alert('हटा नहीं पाए (' + e.code + ').'); showStatus(); }
+        });
+
+        // ===== App install (PWA) =====
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+        let deferredInstall = null;
+        window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstall = e; $('install-btn').classList.remove('hidden'); });
+        window.addEventListener('appinstalled', () => { deferredInstall = null; $('install-btn').classList.add('hidden'); });
+        $('install-btn').addEventListener('click', async () => {
+            if (!deferredInstall) return;
+            deferredInstall.prompt(); await deferredInstall.userChoice;
+            deferredInstall = null; $('install-btn').classList.add('hidden');
+        });
 
         applyPrefs();
         // Splash screen
