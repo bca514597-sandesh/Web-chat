@@ -212,6 +212,16 @@
         .add-st { color: #e91e63; font-size: 1.5rem; padding: 6px; }
         body.dark-theme .sec-title { color: #8696a0; }
 
+        /* ===== Install banner ===== */
+        #install-banner { position: fixed; top: 0; left: 0; right: 0; height: 56px; background: #e91e63; color: #fff; display: flex; align-items: center; gap: 10px; padding: 0 12px; z-index: 500; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+        #install-banner img { width: 36px; height: 36px; border-radius: 8px; }
+        .ib-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+        .ib-text small { opacity: .9; font-size: .75rem; }
+        #ib-install { background: #fff; color: #e91e63; border: none; border-radius: 20px; padding: 8px 18px; font-weight: 700; font-size: .95rem; cursor: pointer; }
+        #ib-close { font-size: 1.2rem; padding: 8px; cursor: pointer; opacity: .9; }
+        body.has-banner { padding-top: 56px; }
+        body.has-banner #app-container { height: calc(100vh - 56px); height: calc(100dvh - 56px); }
+
         @media screen and (max-width: 768px) {
             #app-container { height: 100vh; height: 100dvh; max-width: none; box-shadow: none; border-radius: 0; }
             #sidebar { width: 100%; min-width: 0; border: none; }
@@ -235,6 +245,13 @@
         <div class="splash-logo"><i class="fas fa-comment-dots"></i></div>
         <h1>Web Chat</h1>
         <div class="splash-from">from<b>Rathore Gaming Studio</b></div>
+    </div>
+
+    <div id="install-banner" class="hidden">
+        <img src="icon-192.png" alt="">
+        <div class="ib-text"><b>Web Chat इंस्टॉल करें</b><small>फ्री ऐप • एक टैप में</small></div>
+        <button id="ib-install">इंस्टॉल</button>
+        <i class="fas fa-times" id="ib-close" title="बंद करें"></i>
     </div>
 
     <div id="login-screen">
@@ -332,6 +349,7 @@
                 
                 <button id="dark-mode-btn" class="btn secondary" style="margin-bottom: 15px;"><i class="fas fa-moon"></i> डार्क मोड चालू करें</button>
                 <button id="install-btn" class="btn hidden" style="background:#e91e63; margin-bottom: 10px;"><i class="fas fa-download"></i> ऐप इंस्टॉल करें</button>
+                <button id="notif-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
                 <button id="sound-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
                 <button id="font-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
                 <button id="wallpaper-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
@@ -429,13 +447,14 @@
         }
 
         // ================= SETTINGS / PREFS =================
-        let prefs = Object.assign({ sound: true, fs: 'm', wp: 'pattern', dark: false }, store.get('prefs', {}));
+        let prefs = Object.assign({ sound: true, notif: true, fs: 'm', wp: 'pattern', dark: false }, store.get('prefs', {}));
         function applyPrefs() {
             const b = document.body.classList;
             b.toggle('dark-theme', prefs.dark); b.toggle('fs-large', prefs.fs === 'l');
             b.toggle('fs-small', prefs.fs === 's'); b.toggle('wp-plain', prefs.wp === 'plain');
             $('dark-mode-btn').innerHTML = prefs.dark ? '<i class="fas fa-sun"></i> लाइट मोड चालू करें' : '<i class="fas fa-moon"></i> डार्क मोड चालू करें';
             $('sound-btn').innerHTML = prefs.sound ? '<i class="fas fa-bell"></i> नोटिफ़िकेशन साउंड: चालू' : '<i class="fas fa-bell-slash"></i> नोटिफ़िकेशन साउंड: बंद';
+            updateNotifBtn();
             $('font-btn').innerHTML = '<i class="fas fa-font"></i> टेक्स्ट साइज़: ' + { s: 'छोटा', m: 'सामान्य', l: 'बड़ा' }[prefs.fs];
             $('wallpaper-btn').innerHTML = '<i class="fas fa-image"></i> चैट बैकग्राउंड: ' + (prefs.wp === 'plain' ? 'सादा' : 'पैटर्न');
         }
@@ -553,8 +572,12 @@
                     if (!d) { delete lastMap[it.key]; renderChats(); return; }
                     const m = d.data({ serverTimestamps: 'estimate' });
                     lastMap[it.key] = { text: m.text || '', image: !!m.imageUrl, sender: m.sender, ts: m.timestamp ? m.timestamp.toMillis() : Date.now() };
-                    if (current && current.key === it.key) markRead(it.key);
-                    else if (!first && m.sender !== myEmail && prefs.sound) beep();
+                    const isOpen = current && current.key === it.key;
+                    if (isOpen && !document.hidden) markRead(it.key);
+                    if (!first && m.sender !== myEmail && (!isOpen || document.hidden)) {
+                        if (prefs.sound && !document.hidden) beep();
+                        notifyMsg(it, m);
+                    }
                     first = false;
                     renderChats();
                 }, (e) => console.warn(e.code));
@@ -659,6 +682,7 @@
             updateFavBtn();
             appContainer.classList.add('chat-open');
             markRead(it.key); renderChats();
+            maybeAskNotif();
 
             if (unsubChat) unsubChat();
             const area = $('chat-area');
@@ -967,6 +991,7 @@
             $('inc-avatar').src = photoFor(c.caller); $('inc-name').textContent = nameFor(c.caller);
             $('inc-type').textContent = c.type === 'video' ? '📹 वीडियो कॉल आ रही है...' : '📞 वॉइस कॉल आ रही है...';
             $('incoming-call').classList.remove('hidden'); startRing();
+            if (document.hidden) notifyBrowser('📞 ' + nameFor(c.caller), c.type === 'video' ? 'वीडियो कॉल आ रही है' : 'वॉइस कॉल आ रही है', 'call', true);
         }
         function hideIncoming() { stopRing(); incoming = null; $('incoming-call').classList.add('hidden'); }
 
@@ -1180,16 +1205,78 @@
             } catch (e) { alert('हटा नहीं पाए (' + e.code + ').'); showStatus(); }
         });
 
+        // ===== Notifications =====
+        function notifyBrowser(title, body, tag, urgent) {
+            if (!prefs.notif || !('Notification' in window) || Notification.permission !== 'granted') return;
+            const opts = { body: body, icon: 'icon-192.png', badge: 'icon-192.png', tag: tag, renotify: true, requireInteraction: !!urgent, vibrate: urgent ? [300, 150, 300, 150, 300] : [150], data: { key: tag } };
+            const show = (reg) => reg ? reg.showNotification(title, opts) : new Notification(title, { body: body, icon: 'icon-192.png' });
+            (navigator.serviceWorker ? navigator.serviceWorker.getRegistration() : Promise.resolve(null)).then(show).catch(() => {});
+        }
+        function notifyMsg(it, m) {
+            const who = it.type === 'group' ? (m.sender || '').split('@')[0] + ': ' : '';
+            notifyBrowser(it.title, who + (m.imageUrl ? '📷 फोटो' : (m.text || '')).slice(0, 120), it.key, false);
+        }
+        function updateNotifBtn() {
+            const b = $('notif-btn'); if (!b) return;
+            const p = 'Notification' in window ? Notification.permission : 'unsupported';
+            b.innerHTML = p === 'denied' ? '<i class="fas fa-bell-slash"></i> नोटिफ़िकेशन: ब्लॉक है'
+                : p === 'unsupported' ? '<i class="fas fa-bell-slash"></i> नोटिफ़िकेशन: समर्थित नहीं'
+                : (p === 'granted' && prefs.notif) ? '<i class="fas fa-bell"></i> नोटिफ़िकेशन: चालू'
+                : '<i class="fas fa-bell-slash"></i> नोटिफ़िकेशन: बंद (चालू करें)';
+        }
+        function maybeAskNotif() {
+            if (!('Notification' in window) || Notification.permission !== 'default' || store.get('notifAsked', false)) return;
+            store.set('notifAsked', true);
+            Notification.requestPermission().then((r) => setPref('notif', r === 'granted')).catch(() => {});
+        }
+        $('notif-btn').addEventListener('click', async () => {
+            if (!('Notification' in window)) return toast('यह ब्राउज़र नोटिफ़िकेशन सपोर्ट नहीं करता');
+            if (Notification.permission === 'denied') return alert('नोटिफ़िकेशन ब्लॉक हैं। ब्राउज़र की साइट सेटिंग (ताले/ⓘ आइकन) में जाकर Notifications को "Allow" करें।');
+            if (Notification.permission === 'default') { const r = await Notification.requestPermission(); setPref('notif', r === 'granted'); }
+            else setPref('notif', !prefs.notif);
+            updateNotifBtn();
+        });
+        function openByKey(key) { const it = entries().find((e) => e.key === key); if (it) openChat(it); }
+        if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.key && e.data.key !== 'call') openByKey(e.data.key); });
+        document.addEventListener('visibilitychange', () => { if (!document.hidden && current) { markRead(current.key); renderChats(); } });
+
         // ===== App install (PWA) =====
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
         let deferredInstall = null;
-        window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstall = e; $('install-btn').classList.remove('hidden'); });
-        window.addEventListener('appinstalled', () => { deferredInstall = null; $('install-btn').classList.add('hidden'); });
-        $('install-btn').addEventListener('click', async () => {
-            if (!deferredInstall) return;
-            deferredInstall.prompt(); await deferredInstall.userChoice;
-            deferredInstall = null; $('install-btn').classList.add('hidden');
-        });
+        const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+        function showBanner() {
+            if (isStandalone() || store.get('bannerHiddenUntil', 0) > Date.now()) return;
+            $('install-banner').classList.remove('hidden');
+            document.body.classList.add('has-banner');
+        }
+        function hideBanner(days) {
+            $('install-banner').classList.add('hidden');
+            document.body.classList.remove('has-banner');
+            if (days) store.set('bannerHiddenUntil', Date.now() + days * 864e5);
+        }
+        async function doInstall() {
+            if (deferredInstall) {
+                deferredInstall.prompt();
+                const r = await deferredInstall.userChoice;
+                deferredInstall = null;
+                if (r.outcome === 'accepted') { hideBanner(); $('install-btn').classList.add('hidden'); }
+                return;
+            }
+            if (isIOS) alert('iPhone में: नीचे Share (⬆️) बटन दबाएँ → "Add to Home Screen" चुनें।');
+            else alert('ब्राउज़र के ⋮ (तीन डॉट) मेन्यू में जाकर "Install app" या "Add to Home screen" दबाएँ।');
+        }
+
+        window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstall = e; showBanner(); });
+        window.addEventListener('appinstalled', () => { deferredInstall = null; hideBanner(); $('install-btn').classList.add('hidden'); toast('ऐप इंस्टॉल हो गया!'); });
+        $('ib-install').addEventListener('click', doInstall);
+        $('install-btn').addEventListener('click', doInstall);
+        $('ib-close').addEventListener('click', () => hideBanner(3));   // 3 din tak na dikhe
+        if (!isStandalone()) {
+            $('install-btn').classList.remove('hidden');
+            setTimeout(showBanner, 2400);   // splash ke baad
+        }
 
         applyPrefs();
         // Splash screen
