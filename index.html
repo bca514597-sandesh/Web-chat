@@ -222,6 +222,35 @@
         body.has-banner { padding-top: 56px; }
         body.has-banner #app-container { height: calc(100vh - 56px); height: calc(100dvh - 56px); }
 
+        /* ===== Reply / ticks / menu ===== */
+        .message { cursor: pointer; }
+        .message.deleted { font-style: italic; color: #667781; }
+        .quote { border-left: 4px solid #e91e63; background: rgba(0,0,0,.06); border-radius: 6px; padding: 4px 8px; margin-bottom: 4px; font-size: .8rem; cursor: pointer; }
+        .quote b { display: block; color: #e91e63; font-size: .75rem; }
+        .quote span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; }
+        .tick { margin-left: 4px; font-size: .75rem; color: #8696a0; }
+        .tick.seen { color: #34b7f1; }
+        .message.flash { animation: flash 1.4s; }
+        @keyframes flash { 0%, 70% { box-shadow: 0 0 0 3px #e91e63; } 100% { box-shadow: 0 1px .5px rgba(11,20,26,.13); } }
+        #msg-menu { position: fixed; z-index: 600; background: #fff; border-radius: 10px; box-shadow: 0 4px 18px rgba(0,0,0,.25); overflow: hidden; min-width: 180px; }
+        #msg-menu div { padding: 12px 16px; cursor: pointer; font-size: .95rem; color: #111b21; }
+        #msg-menu div:hover { background: #f0f2f5; }
+        #reply-bar { display: flex; align-items: center; gap: 10px; background: #f0f2f5; padding: 8px 15px; border-top: 1px solid #e9edef; }
+        #reply-bar .rb-body { flex: 1; min-width: 0; border-left: 4px solid #e91e63; padding-left: 8px; }
+        #reply-bar b { display: block; color: #e91e63; font-size: .8rem; }
+        #reply-bar span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .85rem; color: #54656f; }
+        #reply-bar i { cursor: pointer; padding: 6px; color: #54656f; }
+        body.dark-theme .quote { background: rgba(255,255,255,.08); }
+        body.dark-theme .message.deleted { color: #8696a0; }
+        body.dark-theme #msg-menu { background: #233138; }
+        body.dark-theme #msg-menu div { color: #e9edef; }
+        body.dark-theme #msg-menu div:hover { background: #2a3942; }
+        body.dark-theme #reply-bar { background: #202c33; border-color: #111b21; }
+        body.dark-theme #reply-bar span { color: #8696a0; }
+
+        .e2e-note { align-self: center; max-width: 92%; background: rgba(255,244,224,.92); color: #54656f; font-size: .78rem; padding: 6px 12px; border-radius: 10px; text-align: center; cursor: pointer; margin-bottom: 4px; }
+        body.dark-theme .e2e-note { background: #182229; color: #8696a0; }
+
         @media screen and (max-width: 768px) {
             #app-container { height: 100vh; height: 100dvh; max-width: none; box-shadow: none; border-radius: 0; }
             #sidebar { width: 100%; min-width: 0; border: none; }
@@ -231,6 +260,12 @@
             #app-container.chat-open #chat-window { display: flex; }
         }
     </style>
+    <script>
+        window.__bip = null;
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault(); window.__bip = e; window.dispatchEvent(new Event('bip-ready'));
+        });
+    </script>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#e91e63">
     <link rel="icon" href="icon-192.png">
@@ -325,6 +360,7 @@
                 </div>
                 <div class="chat-area" id="chat-area"></div>
                 
+                <div id="reply-bar" class="hidden"><div class="rb-body"><b id="rb-name"></b><span id="rb-text"></span></div><i class="fas fa-times" id="rb-close" title="रद्द करें"></i></div>
                 <div id="emoji-panel" class="hidden"></div>
                 <div class="input-area">
                     <i class="fas fa-smile" id="emoji-btn" style="font-size: 1.5rem; color: #54656f; cursor: pointer;"></i>
@@ -349,6 +385,7 @@
                 
                 <button id="dark-mode-btn" class="btn secondary" style="margin-bottom: 15px;"><i class="fas fa-moon"></i> डार्क मोड चालू करें</button>
                 <button id="install-btn" class="btn hidden" style="background:#e91e63; margin-bottom: 10px;"><i class="fas fa-download"></i> ऐप इंस्टॉल करें</button>
+                <button id="backup-btn" class="btn secondary" style="margin-bottom: 10px;"><i class="fas fa-key"></i> चैट कुंजी का बैकअप</button>
                 <button id="notif-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
                 <button id="sound-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
                 <button id="font-btn" class="btn secondary" style="margin-bottom: 10px;"></button>
@@ -402,6 +439,8 @@
         <div class="sv-tap next" id="sv-next"></div>
     </div>
 
+    <div id="msg-menu" class="hidden"></div>
+
     <div id="toast"></div>
 
     <script>
@@ -432,6 +471,7 @@
         let filter = 'all', searchTerm = '', toastTimer;
         let view = 'chats', unsubCallsIn = null, unsubCallsOut = null, callsInMap = {}, callsOutMap = {}, activeCall = null;
         let unsubStatusIn = null, unsubStatusOut = null, statusInMap = {}, statusOutMap = {};
+        let unsubMeta = null, metaData = {}, msgDocs = [], replyTo = null, lastReads = '', typingPrev = null, typingUntil = {}, typingTimer, lastTypingSent = 0;
 
         const normalizeEmail = (e) => (e || '').trim().toLowerCase();
         const getChatId = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
@@ -523,9 +563,11 @@
                 const dp = safeUrl(user.photoURL) || DEFAULT_ME;
                 $('my-dp').src = dp; $('settings-dp-preview').src = dp;
                 resetChatView();
+                E2E.ready = e2eInit();
                 loadData();
             } else {
                 myEmail = null;
+                E2E.reset();
                 resetChatView();
                 $('contact-list').innerHTML = '';
                 $('password').value = '';
@@ -567,14 +609,16 @@
             list.forEach((it) => {
                 if (lastSubs[it.key]) return;
                 let first = true;
-                lastSubs[it.key] = msgsRef(it).orderBy('timestamp', 'desc').limit(1).onSnapshot((snap) => {
+                lastSubs[it.key] = msgsRef(it).orderBy('timestamp', 'desc').limit(1).onSnapshot(async (snap) => {
                     const d = snap.docs[0];
                     if (!d) { delete lastMap[it.key]; renderChats(); return; }
                     const m = d.data({ serverTimestamps: 'estimate' });
-                    lastMap[it.key] = { text: m.text || '', image: !!m.imageUrl, sender: m.sender, ts: m.timestamp ? m.timestamp.toMillis() : Date.now() };
+                    if (m.enc && !m.deleted) { m.id = d.id; const c = decCache[d.id] || (decCache[d.id] = await decryptMsg(m)); m.text = c.err ? '🔒 एन्क्रिप्टेड मैसेज' : c.t; }
+                    const isNew = !lastMap[it.key] || lastMap[it.key].id !== d.id;
+                    lastMap[it.key] = { id: d.id, text: m.deleted ? '🚫 यह मैसेज हटा दिया गया' : (m.text || ''), image: !!m.imageUrl && !m.deleted, sender: m.sender, ts: m.timestamp ? m.timestamp.toMillis() : Date.now() };
                     const isOpen = current && current.key === it.key;
                     if (isOpen && !document.hidden) markRead(it.key);
-                    if (!first && m.sender !== myEmail && (!isOpen || document.hidden)) {
+                    if (!first && isNew && m.sender !== myEmail && (!isOpen || document.hidden)) {
                         if (prefs.sound && !document.hidden) beep();
                         notifyMsg(it, m);
                     }
@@ -660,6 +704,8 @@
         // ================= OPEN CHAT / MESSAGES =================
         function resetChatView() {
             if (unsubChat) { unsubChat(); unsubChat = null; }
+            if (unsubMeta) { unsubMeta(); unsubMeta = null; }
+            clearTimeout(typingTimer); replyTo = null; $('reply-bar').classList.add('hidden');
             current = null;
             $('active-chat').style.display = 'none';
             $('empty-chat').style.display = 'flex';
@@ -669,12 +715,15 @@
         }
         function showSidebar() { resetChatView(); renderChats(); }
 
+        const chatSub = (it) => it.type === 'group' ? it.members.map((m) => m.split('@')[0]).join(', ') : it.email;
+
         function openChat(it) {
             current = it;
             $('empty-chat').style.display = 'none';
             $('active-chat').style.display = 'flex';
-            $('chat-friend-name').textContent = it.title;
-            $('chat-friend-email').textContent = it.type === 'group' ? it.members.map((m) => m.split('@')[0]).join(', ') : it.email;
+            $('chat-friend-name').textContent = (it.type === 'dm' && E2E.ok ? '🔒 ' : '') + it.title;
+            $('chat-friend-email').textContent = chatSub(it);
+            $('chat-friend-email').style.color = '';
             $('chat-friend-dp').src = it.photo;
             $('del-btn').style.display = it.type === 'dm' ? '' : 'none';
             $('audio-call-btn').style.display = $('video-call-btn').style.display = it.type === 'dm' ? '' : 'none';
@@ -683,48 +732,189 @@
             appContainer.classList.add('chat-open');
             markRead(it.key); renderChats();
             maybeAskNotif();
-
+            clearReply(); msgDocs = []; metaData = {}; lastReads = ''; typingPrev = null; typingUntil = {};
             if (unsubChat) unsubChat();
-            const area = $('chat-area');
-            area.innerHTML = '';
-            unsubChat = msgsRef(it).orderBy('timestamp').onSnapshot((snap) => {
+            if (unsubMeta) unsubMeta();
+            $('chat-area').innerHTML = '';
+
+            unsubChat = msgsRef(it).orderBy('timestamp').onSnapshot(async (snap) => {
+                const my = ++snapSeq;
+                const docs = snap.docs.map((d) => Object.assign({ id: d.id, _pending: d.metadata.hasPendingWrites }, d.data({ serverTimestamps: 'estimate' })));
+                await Promise.all(docs.map(async (d) => { if (d.enc && !d.deleted && !decCache[d.id]) decCache[d.id] = await decryptMsg(d); }));
+                if (my !== snapSeq || !current || current.key !== it.key) return;
+                docs.forEach((d) => { if (d.enc && !d.deleted) { const c = decCache[d.id]; d.text = c.err ? '🔒 मैसेज पढ़ा नहीं जा सका' : c.t; d.replyTo = c.r || null; } });
+                msgDocs = docs;
+                renderMessages(); sendSeen();
+            }, (err) => { console.error(err); $('chat-area').textContent = 'Messages load nahi hue (' + err.code + ').'; });
+
+            // Seen (✓✓) aur typing ke liye chat ka meta document
+            unsubMeta = db.collection('chatMeta').doc(it.key).onSnapshot((d) => {
                 if (!current || current.key !== it.key) return;
-                area.innerHTML = '';
-                snap.forEach((doc) => {
-                    const m = doc.data({ serverTimestamps: 'estimate' });
-                    const mine = m.sender === myEmail;
-                    const div = document.createElement('div');
-                    div.className = 'message ' + (mine ? 'sent' : 'received');
-                    if (it.type === 'group' && !mine) {
-                        const s = document.createElement('div'); s.className = 'msg-sender';
-                        s.textContent = (m.sender || '').split('@')[0]; div.appendChild(s);
-                    }
-                    const imgUrl = safeUrl(m.imageUrl);   // purani bheji hui photos
-                    if (imgUrl) {
-                        const img = document.createElement('img');
-                        img.src = imgUrl; img.loading = 'lazy'; img.style.cursor = 'pointer';
-                        img.onclick = () => window.open(imgUrl, '_blank', 'noopener');
-                        img.onload = () => { area.scrollTop = area.scrollHeight; };
-                        div.appendChild(img);
-                    }
-                    if (m.text) { const t = document.createElement('div'); t.textContent = m.text; div.appendChild(t); }
-                    const time = document.createElement('span');
-                    time.className = 'msg-time';
-                    time.textContent = m.timestamp ? m.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
-                    div.appendChild(time);
-                    area.appendChild(div);
+                metaData = d.exists ? d.data() : {};
+                const r = JSON.stringify(metaData.reads || {});
+                if (r !== lastReads) { lastReads = r; renderMessages(); }
+                const t = metaData.typing || {};
+                Object.keys(t).forEach((e) => {
+                    if (e === myEmail) return;
+                    if (!t[e]) typingUntil[e] = 0;
+                    else if (typingPrev && t[e] !== typingPrev[e]) typingUntil[e] = Date.now() + 4000;   // ghadi ke farq se bachne ke liye local samay
                 });
-                area.scrollTop = area.scrollHeight;
-            }, (err) => { console.error(err); area.textContent = 'Messages load nahi hue (' + err.code + ').'; });
+                typingPrev = Object.assign({}, t);
+                updateTyping();
+            }, (e) => console.warn('meta', e.code));
+
             if (window.innerWidth > 768) $('msg-input').focus();
         }
+
+        function renderMessages() {
+            const it = current; if (!it) return;
+            const area = $('chat-area');
+            const prevTop = area.scrollTop;
+            const nearBottom = !area.children.length || area.scrollHeight - area.scrollTop - area.clientHeight < 90;
+            area.innerHTML = '';
+            area.appendChild(e2eNote(it));
+            const others = it.type === 'group' ? it.members.filter((m) => m !== myEmail) : [it.email];
+            const reads = metaData.reads || {};
+
+            msgDocs.forEach((m) => {
+                const mine = m.sender === myEmail;
+                const div = document.createElement('div');
+                div.className = 'message ' + (mine ? 'sent' : 'received');
+                div.dataset.id = m.id;
+                const time = document.createElement('span');
+                time.className = 'msg-time';
+                time.textContent = m.timestamp ? m.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
+
+                if (m.deleted) {
+                    div.classList.add('deleted');
+                    div.appendChild(document.createTextNode('🚫 यह मैसेज हटा दिया गया'));
+                    div.appendChild(time); area.appendChild(div); return;
+                }
+                if (it.type === 'group' && !mine) {
+                    const s = document.createElement('div'); s.className = 'msg-sender';
+                    s.textContent = (m.sender || '').split('@')[0]; div.appendChild(s);
+                }
+                if (m.replyTo) {
+                    const q = document.createElement('div'); q.className = 'quote';
+                    const qn = document.createElement('b'); qn.textContent = m.replyTo.sender === myEmail ? 'आप' : nameFor(m.replyTo.sender);
+                    const qt = document.createElement('span'); qt.textContent = m.replyTo.text || '';
+                    q.append(qn, qt);
+                    q.addEventListener('click', (e) => { e.stopPropagation(); jumpTo(m.replyTo.id); });
+                    div.appendChild(q);
+                }
+                const imgUrl = safeUrl(m.imageUrl);   // purani bheji hui photos
+                if (imgUrl) {
+                    const img = document.createElement('img');
+                    img.src = imgUrl; img.loading = 'lazy';
+                    img.addEventListener('click', (e) => { e.stopPropagation(); window.open(imgUrl, '_blank', 'noopener'); });
+                    img.onload = () => { if (nearBottom) area.scrollTop = area.scrollHeight; };
+                    div.appendChild(img);
+                }
+                if (m.text) { const t = document.createElement('div'); t.textContent = m.text; div.appendChild(t); }
+
+                if (mine) {
+                    const tick = document.createElement('span'); tick.className = 'tick';
+                    const mts = m.timestamp ? m.timestamp.toMillis() : 0;
+                    if (m._pending) tick.textContent = '🕓';
+                    else if (others.length && others.every((e) => (reads[e] || 0) >= mts)) { tick.textContent = '✓✓'; tick.classList.add('seen'); }
+                    else tick.textContent = '✓';
+                    time.appendChild(tick);
+                }
+                div.appendChild(time);
+                div.addEventListener('click', (e) => showMsgMenu(e, m, div));
+                area.appendChild(div);
+            });
+            area.scrollTop = nearBottom ? area.scrollHeight : prevTop;
+        }
+
+        // ---- Seen ----
+        function sendSeen() {
+            if (!current || document.hidden) return;
+            const fromOthers = msgDocs.filter((m) => m.sender !== myEmail && m.timestamp);
+            if (!fromOthers.length) return;
+            const lastTs = fromOthers[fromOthers.length - 1].timestamp.toMillis();
+            if (((metaData.reads || {})[myEmail] || 0) >= lastTs) return;
+            const v = Math.max(Date.now(), lastTs);
+            (metaData.reads = metaData.reads || {})[myEmail] = v;   // dobara na likhe
+            db.collection('chatMeta').doc(current.key).set({ reads: { [myEmail]: v } }, { merge: true }).catch(() => {});
+        }
+
+        // ---- Typing ----
+        function setTyping(v) {
+            if (!current) return;
+            db.collection('chatMeta').doc(current.key).set({ typing: { [myEmail]: v } }, { merge: true }).catch(() => {});
+        }
+        function updateTyping() {
+            clearTimeout(typingTimer);
+            if (!current) return;
+            const now = Date.now(), el = $('chat-friend-email');
+            const who = Object.keys(typingUntil).filter((e) => typingUntil[e] > now && (current.type === 'group' ? current.members.includes(e) : true));
+            if (who.length) {
+                el.textContent = (current.type === 'group' ? who.map((e) => e.split('@')[0]).join(', ') + ' ' : '') + 'typing...';
+                el.style.color = '#e91e63';
+                typingTimer = setTimeout(updateTyping, Math.min(...who.map((e) => typingUntil[e])) - now + 50);
+            } else { el.textContent = chatSub(current); el.style.color = ''; }
+        }
+        $('msg-input').addEventListener('input', () => {
+            if (!current) return;
+            const now = Date.now();
+            if (now - lastTypingSent < 2500) return;
+            lastTypingSent = now; setTyping(now);
+        });
+
+        // ---- Reply / Copy / Delete ----
+        function setReply(m) {
+            replyTo = { id: m.id, sender: m.sender, text: ((m.imageUrl && !m.text) ? '📷 फोटो' : (m.text || '')).slice(0, 100) };
+            $('rb-name').textContent = m.sender === myEmail ? 'आप' : nameFor(m.sender);
+            $('rb-text').textContent = replyTo.text;
+            $('reply-bar').classList.remove('hidden');
+            $('msg-input').focus();
+        }
+        function clearReply() { replyTo = null; $('reply-bar').classList.add('hidden'); }
+        function jumpTo(id) {
+            const el = $('chat-area').querySelector('[data-id="' + id + '"]');
+            if (!el) return toast('मैसेज नहीं मिला');
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+        }
+        async function deleteMsg(m) {
+            if (!confirm('यह मैसेज सबके लिए हटाएँ?')) return;
+            try { await msgsRef(current).doc(m.id).update({ deleted: true, text: '', imageUrl: null, replyTo: null, enc: null }); }
+            catch (e) { console.error(e); alert('हटा नहीं पाए (' + e.code + '). Firestore Rules में update नियम जोड़ें।'); }
+        }
+        function showMsgMenu(e, m, div) {
+            e.stopPropagation();
+            const menu = $('msg-menu'); menu.innerHTML = '';
+            const add = (label, fn) => { const d = document.createElement('div'); d.textContent = label; d.addEventListener('click', () => { menu.classList.add('hidden'); fn(); }); menu.appendChild(d); };
+            add('↩ रिप्लाई', () => setReply(m));
+            if (m.text) add('📋 कॉपी', () => { try { navigator.clipboard.writeText(m.text); toast('कॉपी हो गया'); } catch (x) {} });
+            if (m.sender === myEmail) add('🗑 सबके लिए हटाएँ', () => deleteMsg(m));
+            menu.classList.remove('hidden');
+            const r = div.getBoundingClientRect();
+            menu.style.top = Math.max(60, Math.min(r.bottom + 4, window.innerHeight - menu.offsetHeight - 10)) + 'px';
+            menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+        }
+        document.addEventListener('click', () => $('msg-menu').classList.add('hidden'));
+        $('rb-close').addEventListener('click', clearReply);
 
         async function sendMessage() {
             const input = $('msg-input'), text = input.value.trim();
             if (!text || !current) return;
-            input.value = '';
+            const target = current, rq = replyTo;
+            let payload = { text: text, sender: myEmail, timestamp: ts() };
+            if (target.type === 'dm' && E2E.ok) {
+                try {
+                    await E2E.ready;
+                    if (!E2E.priv) throw new Error('nokey-me');
+                    payload = { text: '', sender: myEmail, timestamp: ts(), enc: await encryptFor(target.email, { t: text, r: rq }) };
+                } catch (e) {
+                    return toast(e.message === 'nokey' ? target.title + ' ने अभी नया वर्शन नहीं खोला, एन्क्रिप्टेड मैसेज नहीं जा सकता' : 'एन्क्रिप्शन चालू नहीं है — पेज रीफ्रेश करें');
+                }
+            } else if (rq) payload.replyTo = rq;
+            input.value = ''; clearReply();
             $('emoji-panel').classList.add('hidden');
-            try { await msgsRef(current).add({ text: text, sender: myEmail, timestamp: ts() }); }
+            lastTypingSent = 0; setTyping(0);
+            try { await msgsRef(target).add(payload); }
             catch (err) { console.error(err); input.value = text; alert('Message nahi gaya (' + err.code + ').'); }
         }
 
@@ -1205,6 +1395,133 @@
             } catch (e) { alert('हटा नहीं पाए (' + e.code + ').'); showStatus(); }
         });
 
+        // ================= END-TO-END ENCRYPTION (ek-se-ek chat) =================
+        // Har user ke paas ECDH (P-256) kunji-jodi hai. Nijee kunji sirf is device par rehti hai.
+        // Message AES-GCM se tala-band hoke jaata hai; Firestore mein sirf ciphertext dikhta hai.
+        const E2E = {
+            ok: !!(window.crypto && window.crypto.subtle), priv: null, pubRaw: null, jwk: null, shared: {}, peerPub: {}, ready: Promise.resolve(),
+            reset() { this.priv = this.pubRaw = this.jwk = null; this.shared = {}; this.peerPub = {}; decCache = {}; this.ready = Promise.resolve(); }
+        };
+        let decCache = {}, snapSeq = 0;
+        const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+        const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+        const ECDH = { name: 'ECDH', namedCurve: 'P-256' };
+
+        async function sharedKey(otherRaw) {
+            if (E2E.shared[otherRaw]) return E2E.shared[otherRaw];
+            const pub = await crypto.subtle.importKey('raw', unb64(otherRaw), ECDH, false, []);
+            const k = await crypto.subtle.deriveKey({ name: 'ECDH', public: pub }, E2E.priv, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+            return (E2E.shared[otherRaw] = k);
+        }
+        async function getPeerPub(email) {
+            const c = E2E.peerPub[email];
+            if (c && Date.now() - c.t < (c.raw ? 60000 : 5000)) return c.raw;
+            try {
+                const d = await db.collection('publicKeys').doc(email).get();
+                const raw = d.exists ? d.data().raw : null;
+                E2E.peerPub[email] = { raw: raw, t: Date.now() }; return raw;
+            } catch (e) { return c ? c.raw : null; }
+        }
+        async function encryptFor(peerEmail, obj) {
+            const rpk = await getPeerPub(peerEmail);
+            if (!rpk) throw new Error('nokey');
+            const key = await sharedKey(rpk), iv = crypto.getRandomValues(new Uint8Array(12));
+            const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(JSON.stringify(obj)));
+            return { v: 1, iv: b64(iv), ct: b64(ct), spk: E2E.pubRaw, rpk: rpk };   // dono public kunjiyan saath: bhejne wala aur paane wala, dono khol sakein
+        }
+        async function decryptMsg(m) {
+            try {
+                await E2E.ready;
+                if (!E2E.priv) return { err: true };
+                const other = m.sender === myEmail ? m.enc.rpk : m.enc.spk;
+                const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(m.enc.iv) }, await sharedKey(other), unb64(m.enc.ct));
+                return JSON.parse(new TextDecoder().decode(pt));
+            } catch (e) { return { err: true }; }
+        }
+        async function safetyCode(peer) {
+            const theirs = await getPeerPub(peer);
+            if (!E2E.pubRaw || !theirs) return null;
+            const [a, b] = [E2E.pubRaw, theirs].sort();
+            const h = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(a + b)));
+            const g = []; for (let i = 0; i < 6; i++) g.push(String(((h[2 * i] << 8) | h[2 * i + 1]) % 100000).padStart(5, '0'));
+            return g.join(' ');
+        }
+        function e2eNote(it) {
+            const n = document.createElement('div'); n.className = 'e2e-note';
+            if (it.type === 'dm' && E2E.ok) {
+                n.textContent = '🔒 इस चैट के नए मैसेज एन्क्रिप्टेड हैं, सिर्फ़ आप दोनों पढ़ सकते हैं। सुरक्षा कोड देखने के लिए दबाएँ।';
+                n.addEventListener('click', async () => {
+                    const code = await safetyCode(it.email);
+                    alert(code ? 'सुरक्षा कोड:\\n' + code + '\\n\\nसामने वाले के फ़ोन पर भी यही कोड दिखना चाहिए। फ़ोन पर या मिलकर दोनों कोड मिलाएँ। मेल खाएँ तो चैट सुरक्षित है।' : 'सुरक्षा कोड अभी नहीं बन पाया। सामने वाले ने नया वर्शन खोला है?');
+                });
+            } else n.textContent = it.type === 'group' ? 'ग्रुप चैट के मैसेज अभी एन्क्रिप्टेड नहीं हैं।' : 'यह चैट एन्क्रिप्टेड नहीं है।';
+            return n;
+        }
+
+        // ---- kunji ka bandobast ----
+        async function pbkdf(pass, salt) {
+            const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+            return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salt, iterations: 250000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+        }
+        async function makeBackup() {
+            if (!E2E.ok) return alert('यह ब्राउज़र एन्क्रिप्शन सपोर्ट नहीं करता।');
+            await E2E.ready;
+            if (!E2E.priv) return alert('अभी कोई कुंजी चालू नहीं है।');
+            const p1 = prompt('बैकअप पासवर्ड चुनें (कम से कम 8 अक्षर)।\\nइसे भूलने पर बैकअप बेकार हो जाएगा, और कोई इसे वापस नहीं निकाल सकता:');
+            if (!p1) return;
+            if (p1.length < 8) return alert('पासवर्ड कम से कम 8 अक्षर का रखें।');
+            if (prompt('पासवर्ड दोबारा लिखें:') !== p1) return alert('दोनों पासवर्ड मेल नहीं खाए।');
+            try {
+                const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+                const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, await pbkdf(p1, salt), new TextEncoder().encode(JSON.stringify({ priv: E2E.jwk, pub: E2E.pubRaw })));
+                await db.collection('keyBackups').doc(myEmail).set({ salt: b64(salt), iv: b64(iv), ct: b64(ct), updatedAt: Date.now() });
+                toast('कुंजी का बैकअप बन गया');
+            } catch (e) { console.error(e); alert('बैकअप नहीं बन पाया (' + (e.code || e.message) + ').'); }
+        }
+        async function restoreBackup(pass, remotePub) {
+            try {
+                const d = await db.collection('keyBackups').doc(myEmail).get();
+                if (!d.exists) return null;
+                const v = d.data();
+                const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(v.iv) }, await pbkdf(pass, unb64(v.salt)), unb64(v.ct));
+                const k = JSON.parse(new TextDecoder().decode(pt));
+                return k.pub === remotePub ? k : null;
+            } catch (e) { return null; }
+        }
+        async function e2eInit() {
+            E2E.reset();
+            if (!E2E.ok) return;
+            const lk = 'e2e:' + myEmail;
+            let local = null, remote = null;
+            try { local = JSON.parse(localStorage.getItem(lk)); } catch (e) {}
+            try { const d = await db.collection('publicKeys').doc(myEmail).get(); if (d.exists) remote = d.data().raw; } catch (e) { console.warn(e); }
+            const useKey = async (k) => { E2E.priv = await crypto.subtle.importKey('jwk', k.priv, ECDH, false, ['deriveKey']); E2E.pubRaw = k.pub; E2E.jwk = k.priv; };
+            const publish = () => db.collection('publicKeys').doc(myEmail).set({ raw: E2E.pubRaw, updatedAt: Date.now() });
+            const generate = async () => {
+                const kp = await crypto.subtle.generateKey(ECDH, true, ['deriveKey']);
+                const k = { priv: await crypto.subtle.exportKey('jwk', kp.privateKey), pub: b64(await crypto.subtle.exportKey('raw', kp.publicKey)) };
+                try { localStorage.setItem(lk, JSON.stringify(k)); } catch (e) {}
+                await useKey(k); await publish();
+            };
+            try {
+                if (local) {
+                    await useKey(local);
+                    if (remote !== local.pub) {
+                        if (remote && !confirm('इस खाते की एन्क्रिप्शन कुंजी किसी दूसरे डिवाइस पर बदली जा चुकी है।\\n\\nOK: इसी डिवाइस की कुंजी चालू करें (दूसरे डिवाइस पर नए मैसेज नहीं खुलेंगे)\\nCancel: कुछ न बदलें')) { E2E.priv = null; return; }
+                        await publish();
+                    }
+                } else if (remote) {
+                    const pass = prompt('यह नया डिवाइस है। पुराने एन्क्रिप्टेड मैसेज पढ़ने के लिए अपना बैकअप पासवर्ड लिखें।\\n\\n(खाली छोड़ें तो नई कुंजी बनेगी और पुराने एन्क्रिप्टेड मैसेज नहीं खुलेंगे)');
+                    if (pass) {
+                        const k = await restoreBackup(pass, remote);
+                        if (k) { try { localStorage.setItem(lk, JSON.stringify(k)); } catch (e) {} await useKey(k); }
+                        else alert('बैकअप नहीं खुला (पासवर्ड गलत है या बैकअप बना ही नहीं था)। इस बार एन्क्रिप्टेड मैसेज बंद रहेंगे। पेज रीफ्रेश करके फिर कोशिश करें।');
+                    } else await generate();
+                } else await generate();
+            } catch (e) { console.error('e2e init', e); E2E.priv = null; }
+        }
+        $('backup-btn').addEventListener('click', makeBackup);
+
         // ===== Notifications =====
         function notifyBrowser(title, body, tag, urgent) {
             if (!prefs.notif || !('Notification' in window) || Notification.permission !== 'granted') return;
@@ -1238,11 +1555,11 @@
         });
         function openByKey(key) { const it = entries().find((e) => e.key === key); if (it) openChat(it); }
         if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.key && e.data.key !== 'call') openByKey(e.data.key); });
-        document.addEventListener('visibilitychange', () => { if (!document.hidden && current) { markRead(current.key); renderChats(); } });
+        document.addEventListener('visibilitychange', () => { if (!document.hidden && current) { markRead(current.key); renderChats(); sendSeen(); } });
 
         // ===== App install (PWA) =====
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-        let deferredInstall = null;
+        let deferredInstall = window.__bip || null;
         const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
         const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
@@ -1256,19 +1573,31 @@
             document.body.classList.remove('has-banner');
             if (days) store.set('bannerHiddenUntil', Date.now() + days * 864e5);
         }
+        async function installHelp() {
+            if (isIOS) return alert('iPhone में: नीचे Share (⬆️) बटन दबाएँ → "Add to Home Screen" चुनें।');
+            if (/FBAN|FBAV|Instagram|Line\/|; wv\)|WhatsApp|Telegram/i.test(navigator.userAgent))
+                return alert('आप किसी ऐप के अंदर वाले ब्राउज़र में हैं। इस लिंक को Chrome में खोलकर इंस्टॉल करें (⋮ → "Open in Chrome").');
+            let mOk = false, swOk = false;
+            try { const r = await fetch('manifest.json', { cache: 'no-store' }); mOk = r.ok && (await r.json()).icons.length > 0; } catch (e) {}
+            try { swOk = !!(navigator.serviceWorker && await navigator.serviceWorker.getRegistration()); } catch (e) {}
+            alert('सीधा इंस्टॉल अभी उपलब्ध नहीं है।\n\nजाँच:\n' + (mOk ? '✅' : '❌') + ' manifest.json\n' + (swOk ? '✅' : '❌') + ' service worker\n\n' +
+                (mOk && swOk
+                    ? 'अगर ऐप पहले से इंस्टॉल है, तो उसे होम स्क्रीन के आइकन से खोलें (या पहले हटाकर दोबारा कोशिश करें)। नहीं तो ⋮ मेन्यू में "Install app" दबाएँ।'
+                    : 'GitHub में manifest.json, sw.js, icon-192.png और icon-512.png को index.html वाले फ़ोल्डर में डालें, फिर पेज रीफ्रेश करें।'));
+        }
         async function doInstall() {
             if (deferredInstall) {
                 deferredInstall.prompt();
                 const r = await deferredInstall.userChoice;
-                deferredInstall = null;
+                deferredInstall = null; window.__bip = null;
                 if (r.outcome === 'accepted') { hideBanner(); $('install-btn').classList.add('hidden'); }
                 return;
             }
-            if (isIOS) alert('iPhone में: नीचे Share (⬆️) बटन दबाएँ → "Add to Home Screen" चुनें।');
-            else alert('ब्राउज़र के ⋮ (तीन डॉट) मेन्यू में जाकर "Install app" या "Add to Home screen" दबाएँ।');
+            installHelp();
         }
 
-        window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstall = e; showBanner(); });
+        if (deferredInstall) showBanner();
+        window.addEventListener('bip-ready', () => { deferredInstall = window.__bip; showBanner(); });
         window.addEventListener('appinstalled', () => { deferredInstall = null; hideBanner(); $('install-btn').classList.add('hidden'); toast('ऐप इंस्टॉल हो गया!'); });
         $('ib-install').addEventListener('click', doInstall);
         $('install-btn').addEventListener('click', doInstall);
